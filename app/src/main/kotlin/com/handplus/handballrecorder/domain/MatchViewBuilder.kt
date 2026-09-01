@@ -13,6 +13,8 @@ import io.github.kinjoryura.handballtoolkit.buildTimeline
 import io.github.kinjoryura.handballtoolkit.convertSampleMatch
 import io.github.kinjoryura.handballtoolkit.decodeSampleConfiguration
 import io.github.kinjoryura.handballtoolkit.sampleMatchRequiredIdCount
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /**
@@ -134,17 +136,25 @@ sealed class HighlightRouteException(message: String) : Exception(message) {
  *
  * **成功したら [MatchView] の所有権は呼び出し側に移る。** 不要になったら `close()` すること
  * （ViewModel の `onCleared`）。
+ *
+ * **組み立ては [Dispatchers.Default] で回す。** 取得（IO）と違い CPU の仕事だが、
+ * `convertSampleMatch` と `buildTimeline` は fact 数に比例して伸びる FFI 呼び出しで、
+ * `viewModelScope`（= Main）で直に回すと最初のフレームが遅れる。
  */
 suspend fun SampleFeed.loadMatchView(slug: String): FeedResult<MatchView> =
     when (val fetched = fetchMatch(slug)) {
-        is FeedResult.Success -> buildCatching { MatchViewBuilder.buildMatch(slug, fetched.value) }
+        is FeedResult.Success -> withContext(Dispatchers.Default) {
+            buildCatching { MatchViewBuilder.buildMatch(slug, fetched.value) }
+        }
         is FeedResult.Failure -> fetched
     }
 
 /** 配信からハイライトを取得して [MatchView] まで組み立てる（[loadMatchView] のハイライト版）。 */
 suspend fun SampleFeed.loadHighlightView(slug: String): FeedResult<MatchView> =
     when (val fetched = fetchHighlight(slug)) {
-        is FeedResult.Success -> buildCatching { MatchViewBuilder.buildHighlight(slug, fetched.value) }
+        is FeedResult.Success -> withContext(Dispatchers.Default) {
+            buildCatching { MatchViewBuilder.buildHighlight(slug, fetched.value) }
+        }
         is FeedResult.Failure -> fetched
     }
 

@@ -41,13 +41,16 @@ DB ハンドルとトランザクション境界、素朴な CRUD、ID / 時刻�
 
 ## 現状
 
-**Jetpack Compose の器まで置いた段階**です。シード（handball-toolkit の
+**一覧と試合詳細まで入った段階**です。シード（handball-toolkit の
 [`examples/android`](https://github.com/kinjo-ryura/handball-toolkit/tree/main/examples/android)）が
 持っていたデモ UI — ボタン 7 個でシェル契約の write 経路を踏む画面 — は、見る専用 MVP とは
-用途が逆なので捨てました。いま入っているのは Material 3 のテーマと、`list` /
-`detail/{kind}/{slug}` の 2 つの行き先を持つ `NavHost` だけで、**画面の中身は
-プレースホルダ**です。配信データの取得・一覧・タイムライン / スタッツ・YouTube 再生は
-これから実装します。
+用途が逆なので捨てました。
+
+動くのは配信データの取得（`data/SampleFeed.kt`）、試合 / ハイライトの一覧（`ui/list/`。
+タブ 2 つ + 動画有無フィルタ）、試合詳細（`ui/detail/`。phase ごとのタイムラインと
+チーム別 / 前後半別 / 選手別スタッツ）まで。**残っているのは YouTube 再生
+（動画枠はプレースホルダのまま。シークの受け口 `onSeek` だけ用意してある）と
+ハイライト詳細（「すべて再生」を含む）**です。
 
 **Room の DB 層（`db/`）と 15 メソッドの write repository（`RoomWriteRepositories.kt`）は
 残してあります。** 見る専用 MVP は端末に保存しないのでどちらも通りませんが、記録機能を

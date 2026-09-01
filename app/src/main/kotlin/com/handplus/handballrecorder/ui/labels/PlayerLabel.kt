@@ -61,6 +61,15 @@ object PlayerOrdering {
 
     private val collator: Collator = Collator.getInstance(Locale.JAPANESE)
 
+    /**
+     * 名前どうしの比較。**Unicode のコード順で比べない**（日本語名が読み順と合わず、
+     * 同姓の並びが画面ごとに違って見える）。Swift の `localizedStandardCompare` に相当。
+     *
+     * スタッツの選手行（[PlayerStatsOrdering][com.handplus.handballrecorder.ui.detail.PlayerStatsOrdering]）が
+     * 最後のキーとして使うので、[Collator] の生成をここ 1 本に寄せてある。
+     */
+    val byName: Comparator<String> = Comparator { lhs, rhs -> collator.compare(lhs, rhs) }
+
     val byJerseyNumber: Comparator<Player> = Comparator { lhs, rhs ->
         val l = lhs.jerseyNumber
         val r = rhs.jerseyNumber
@@ -69,7 +78,7 @@ object PlayerOrdering {
             // 背番号ありが先、無しが末尾。
             l != null && r == null -> -1
             l == null && r != null -> 1
-            else -> collator.compare(lhs.name, rhs.name)
+            else -> byName.compare(lhs.name, rhs.name)
         }
     }
 }

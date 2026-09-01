@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,6 +23,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.handplus.handballrecorder.ui.detail.MatchDetailScreen
+import com.handplus.handballrecorder.ui.list.MatchListScreen
 import com.handplus.handballrecorder.ui.theme.HandballRecorderTheme
 
 /**
@@ -66,7 +67,7 @@ object Routes {
 fun HandballRecorderApp(navController: NavHostController = rememberNavController()) {
     NavHost(navController = navController, startDestination = Routes.LIST) {
         composable(Routes.LIST) {
-            ListPlaceholderScreen(
+            MatchListScreen(
                 onOpen = { kind, slug -> navController.navigate(Routes.detail(kind, slug)) },
             )
         }
@@ -77,61 +78,38 @@ fun HandballRecorderApp(navController: NavHostController = rememberNavController
                 navArgument(Routes.ARG_SLUG) { type = NavType.StringType },
             ),
         ) { entry ->
-            DetailPlaceholderScreen(
-                kind = entry.arguments?.getString(Routes.ARG_KIND).orEmpty(),
-                slug = entry.arguments?.getString(Routes.ARG_SLUG).orEmpty(),
-                onBack = { navController.popBackStack() },
-            )
-        }
-    }
-}
-
-/**
- * 一覧のプレースホルダ。中身（配信 index の取得・タブ・動画フィルタ）は次のチャンクで入れる。
- * ここに置いてあるダミー行は、遷移と戻るが通っていることを目で確かめるためだけのもの。
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ListPlaceholderScreen(onOpen: (kind: String, slug: String) -> Unit) {
-    Scaffold(
-        topBar = { TopAppBar(title = { Text("ハンド記録") }) },
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text("一覧（未実装）", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "配信中のサンプル試合 / ハイライトの取得はまだ入っていない。",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            OutlinedButton(onClick = { onOpen(Routes.KIND_MATCH, "dummy-match") }) {
-                Text("ダミー行を開く（試合）")
-            }
-            OutlinedButton(onClick = { onOpen(Routes.KIND_HIGHLIGHT, "dummy-highlight") }) {
-                Text("ダミー行を開く（ハイライト）")
+            val kind = entry.arguments?.getString(Routes.ARG_KIND).orEmpty()
+            val slug = entry.arguments?.getString(Routes.ARG_SLUG).orEmpty()
+            val onBack = { navController.popBackStack(); Unit }
+            when (kind) {
+                Routes.KIND_HIGHLIGHT -> HighlightPlaceholderScreen(slug = slug, onBack = onBack)
+                // 未知の kind も試合として開く。slug の形が配信の規約に合わなければ
+                // `SampleFeed` が取りに行く前に弾き、「見つかりません」を出す。
+                else -> MatchDetailScreen(
+                    slug = slug,
+                    onBack = onBack,
+                    // **シークの受け口だけ用意する。** 実体（YouTube の WebView）は次のチャンク。
+                    // ここで何もしないラムダを渡しておけば、行タップが落ちることはない。
+                    onSeek = {},
+                )
             }
         }
     }
 }
 
 /**
- * 詳細のプレースホルダ。受け取った引数をそのまま出すだけで、動画枠・タイムライン・
- * スタッツは次のチャンクで入れる。
+ * ハイライト詳細のプレースホルダ。中身（動画枠 / シーン一覧 / 「すべて再生」）は次のチャンク。
+ *
+ * 一覧のハイライトタブからここへ遷移できることまでが、このチャンクの範囲。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailPlaceholderScreen(kind: String, slug: String, onBack: () -> Unit) {
+fun HighlightPlaceholderScreen(slug: String, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("詳細（未実装）") },
-                navigationIcon = {
-                    TextButton(onClick = onBack) { Text("戻る") }
-                },
+                title = { Text("ハイライト詳細（未実装）") },
+                navigationIcon = { TextButton(onClick = onBack) { Text("戻る") } },
             )
         },
     ) { innerPadding ->
@@ -142,24 +120,19 @@ fun DetailPlaceholderScreen(kind: String, slug: String, onBack: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("kind: $kind", style = MaterialTheme.typography.bodyLarge)
-            Text("slug: $slug", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "シーン一覧と「すべて再生」はこれから実装します。",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text("slug: $slug", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-private fun ListPlaceholderPreview() {
+private fun HighlightPlaceholderPreview() {
     HandballRecorderTheme {
-        ListPlaceholderScreen(onOpen = { _, _ -> })
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun DetailPlaceholderPreview() {
-    HandballRecorderTheme {
-        DetailPlaceholderScreen(kind = Routes.KIND_MATCH, slug = "dummy-match", onBack = {})
+        HighlightPlaceholderScreen(slug = "sample-highlight", onBack = {})
     }
 }
