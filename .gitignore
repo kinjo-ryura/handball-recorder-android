@@ -1,0 +1,20 @@
+# Gradle / Android ビルド生成物
+.gradle/
+build/
+local.properties
+
+# 配布された .aar を置く場所（Releases から落とす。コミットしない）
+app/libs/
+
+# 署名鍵（絶対にコミットしない。失うと以後の更新を配れない）
+*.jks
+*.keystore
+keystore.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# nix / direnv
+.direnv/
