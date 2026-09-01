@@ -103,4 +103,9 @@ dependencies {
     ksp("androidx.room:room-compiler:2.7.2")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+
+    // ── 単体テスト（JVM 上で回る。Android 実機 / エミュレータは要らない）──
+    // CI の `check` が `:app:testDebugUnitTest` を回すので、テストが 0 件のままにならないよう
+    // ここで実行系を宣言する。**アプリ本体の依存は増やさない**（testImplementation は APK に入らない）。
+    testImplementation("junit:junit:4.13.2")
 }
