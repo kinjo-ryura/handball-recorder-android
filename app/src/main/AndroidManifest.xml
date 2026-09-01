@@ -1,9 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 配信中のサンプル試合 / ハイライト JSON を取得する。これが無いと通信そのものが
+         できず、アプリは空の一覧しか出せない。 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- アイコンは 2 系統。API 26 以降は mipmap-anydpi-v26/ の adaptive icon が、
+         API 24/25 は mipmap-*dpi/ の PNG が使われる（minSdk = 24 なので後者が要る）。
+         roundIcon は端末側が丸いアイコンを求めたときだけ参照される。 -->
     <application
-        android:label="Handball Toolkit Shell"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/Theme.HandballRecorder">
         <activity
             android:name=".MainActivity"
             android:exported="true">

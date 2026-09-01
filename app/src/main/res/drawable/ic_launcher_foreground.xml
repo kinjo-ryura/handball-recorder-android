@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ランチャーアイコンの前景（adaptive icon の <foreground>）。五角形を作る 5 本のバーと、
+     アイコンの縁で切れる白い破片 2 つ。意匠は iOS 版（HandballRecorder.icon）からの移植。
+     琥珀は 3 アプリを貫く family の印で、背景の紫がハンド記録固有の色。
+
+     ■ 座標系
+     viewport は元データと同じ 1024×1024 で、**これを 108dp 全面に対応させる**。
+     パスは元の SVG からそのまま写せる。左上のバーと破片 2 つ（rect_top_left 2.svg）だけは
+     元データが transform="translate(1024 0) scale(-1 1)" の中にあるため、x を 1024-x に
+     置き換えて展開済み（見えている形は「右上のバーの左右反転」）。
+
+     ■ 大きさ: scale 0.86 / translate 71.68（= キャンバス中心 (512,512) を軸に 0.86 倍）
+     5 本のバーは元座標で x 164.7..859.3 / y 148.8..811.0。**5 本とも (512,512) からの
+     最大半径が 363.2 でそろっている**（元データが正五角形の外接円に載っているため）。
+       円マスクの半径      36dp = 341.33 → 角が切れない上限 scale 0.9398
+       キーライン（推奨）  33dp = 312.93 → **scale 0.8615**
+     採ったのは後者に丸めた 0.86（最大半径 312.4 = 32.94dp）。**外接円が Android の
+     キーライン円とほぼ一致する**大きさで、円 / squircle / ほぼ四角のどのマスクでも角が
+     切れない。五角形は 108dp 上で 63.1 × 60.2dp（見える 72dp の 88%）を占める。
+     中心は元座標 (512, 479.9) → 変換後 (512, 484.5)。**iOS と同じく中央よりわずかに上**
+     （キャンバス中心より 27.5 単位 = 2.9dp 上）。
+
+     ■ 縁で切れる白い破片 2 つ
+     元データにある「キャンバス外へはみ出した破片」。**切られること自体が意匠**なので
+     マスクに任せてそのまま置く（右上と左下に、縁で切れた白として現れる）。
+
+     ■ 質感（iOS の soft-light + translucency 0.5 + 影の近似）
+     vector drawable は blend mode も影も持てないので、**iOS の実物（apps-site の
+     icon-512.png）から合成後の色を測って**近似している。数値はすべて実測合わせ:
+       面    琥珀 = 縦グラデーション #F7B02E → #D07B46 を α 0.90 で。
+             白　 = 白を α 1.00 → 0.60 で縦に振る（iOS は上ほど白く下ほど紫が透ける。
+                    実測の実効 α は y96 で 0.99、y736 で 0.68）。
+       縁    各形の内側 0.5..9.5 に沿って明るい線を 1 本（iOS は縁の内側 4..20 に
+             ピーク (255,203,153) の光の帯を持つ。これがガラスらしさの正体）。
+       影    各形の外側 0..21 に 2 段の暗い線（iOS は輪郭の外が 6〜9 レベル暗い）。
+     **白のバーは琥珀より上に描く。** iOS では白が下だが、soft-light は白い下地を白のまま
+     残すため合成結果は「白が上」に見える（実測でも重なりは白 (251,244,253)）。
+
+     ■ 直したときにやること
+     - scale / translate を変えたら scripts/generate-launcher-icons.sh の定数も直す
+       （スクリプトが食い違いを検査して止まる）
+     - 形を変えたら ic_launcher_monochrome.xml も手で同期させる
+     - 色・形を変えたら scripts/generate-launcher-icons.sh を回して PNG も作り直す -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <group
+        android:scaleX="0.86"
+        android:scaleY="0.86"
+        android:translateX="71.68"
+        android:translateY="71.68">
+        <!-- 影（1）: 外側 9..21 -->
+        <path
+            android:pathData="M 160.1,382.2 L 340.6,323.3 Q 359.6,317.1 365.8,336.1 L 497.7,739.6 Q 503.9,758.6 484.9,764.8 L 304.4,823.7 Q 285.4,829.9 279.2,810.9 L 147.3,407.4 Q 141.1,388.4 160.1,382.2 Z"
+            android:strokeColor="#08000000"
+            android:strokeWidth="12" />
+        <path
+            android:pathData="M 280.0,806.0 L 280.0,616.0 Q 280.0,596.0 300.0,596.0 L 724.0,596.0 Q 744.0,596.0 744.0,616.0 L 744.0,806.0 Q 744.0,826.0 724.0,826.0 L 300.0,826.0 Q 280.0,826.0 280.0,806.0 Z"
+            android:strokeColor="#08000000"
+            android:strokeWidth="12" />
+        <path
+            android:pathData="M 719.6,823.7 L 539.1,764.8 Q 520.1,758.6 526.3,739.6 L 658.2,336.1 Q 664.4,317.1 683.4,323.3 L 863.9,382.2 Q 882.9,388.4 876.7,407.4 L 744.8,810.9 Q 738.6,829.9 719.6,823.7 Z"
+            android:strokeColor="#08000000"
+            android:strokeWidth="12" />
+        <path
+            android:pathData="M 873.2,410.9 L 761.1,564.7 Q 749.3,580.9 733.1,569.2 L 389.2,319.1 Q 373.0,307.3 384.8,291.1 L 496.9,137.3 Q 508.7,121.1 524.9,132.8 L 868.8,382.9 Q 885.0,394.7 873.2,410.9 Z"
+            android:strokeColor="#08000000"
+            android:strokeWidth="12" />
+        <path
+            android:pathData="M 150.8,410.9 L 262.9,564.7 Q 274.7,580.9 290.9,569.2 L 634.8,319.1 Q 651.0,307.3 639.2,291.1 L 527.1,137.3 Q 515.3,121.1 499.1,132.8 L 155.2,382.9 Q 139.0,394.7 150.8,410.9 Z"
+            android:strokeColor="#08000000"
+            android:strokeWidth="12" />
+        <path
+            android:pathData="M 621.4,92.8 L 706.6,263.1 Q 715.6,281.0 733.5,272.1 L 1113.9,82.3 Q 1131.8,73.3 1122.9,55.4 L 1037.8,-115.0 Q 1028.8,-132.9 1010.9,-124.0 L 630.4,65.9 Q 612.5,74.9 621.4,92.8 Z"
+            android:strokeColor="#08000000"
+            android:strokeWidth="12" />
+        <path
+            android:pathData="M -244.3,823.2 L -107.6,955.5 Q -93.2,969.4 -79.2,955.0 L 216.6,649.6 Q 230.5,635.2 216.1,621.2 L 79.4,488.9 Q 65.0,475.0 51.0,489.4 L -244.8,794.8 Q -258.7,809.2 -244.3,823.2 Z"
+            android:strokeColor="#08000000"
+            android:strokeWidth="12" />
+        <!-- 影（2）: 外側 0..10。内側ほど濃い -->
+        <path
+            android:pathData="M 172.7,388.6 L 334.2,335.9 Q 353.2,329.7 359.4,348.7 L 485.1,733.2 Q 491.3,752.2 472.3,758.4 L 310.8,811.1 Q 291.8,817.3 285.6,798.3 L 159.9,413.8 Q 153.7,394.8 172.7,388.6 Z"
+            android:strokeColor="#12000000"
+            android:strokeWidth="10" />
+        <path
+            android:pathData="M 290.0,796.0 L 290.0,626.0 Q 290.0,606.0 310.0,606.0 L 714.0,606.0 Q 734.0,606.0 734.0,626.0 L 734.0,796.0 Q 734.0,816.0 714.0,816.0 L 310.0,816.0 Q 290.0,816.0 290.0,796.0 Z"
+            android:strokeColor="#12000000"
+            android:strokeWidth="10" />
+        <path
+            android:pathData="M 713.2,811.1 L 551.7,758.4 Q 532.7,752.2 538.9,733.2 L 664.6,348.7 Q 670.8,329.7 689.8,335.9 L 851.3,388.6 Q 870.3,394.8 864.1,413.8 L 738.4,798.3 Q 732.2,817.3 713.2,811.1 Z"
+            android:strokeColor="#12000000"
+            android:strokeWidth="10" />
+        <path
+            android:pathData="M 859.2,413.1 L 758.9,550.8 Q 747.1,567.0 730.9,555.2 L 403.2,316.9 Q 387.0,305.1 398.8,288.9 L 499.1,151.2 Q 510.9,135.0 527.1,146.8 L 854.8,385.1 Q 871.0,396.9 859.2,413.1 Z"
+            android:strokeColor="#12000000"
+            android:strokeWidth="10" />
+        <path
+            android:pathData="M 164.8,413.1 L 265.1,550.8 Q 276.9,567.0 293.1,555.2 L 620.8,316.9 Q 637.0,305.1 625.2,288.9 L 524.9,151.2 Q 513.1,135.0 496.9,146.8 L 169.2,385.1 Q 153.0,396.9 164.8,413.1 Z"
+            android:strokeColor="#12000000"
+            android:strokeWidth="10" />
+        <path
+            android:pathData="M 634.8,97.3 L 711.1,249.7 Q 720.1,267.6 738.0,258.7 L 1100.5,77.8 Q 1118.4,68.8 1109.5,50.9 L 1033.3,-101.6 Q 1024.3,-119.5 1006.4,-110.6 L 643.8,70.4 Q 625.9,79.4 634.8,97.3 Z"
+            android:strokeColor="#12000000"
+            android:strokeWidth="10" />
+        <path
+            android:pathData="M -230.2,823.0 L -107.8,941.3 Q -93.4,955.3 -79.4,940.9 L 202.4,649.8 Q 216.4,635.4 202.0,621.4 L 79.6,503.1 Q 65.2,489.1 51.2,503.5 L -230.6,794.6 Q -244.6,809.0 -230.2,823.0 Z"
+            android:strokeColor="#12000000"
+            android:strokeWidth="10" />
+        <!-- 左下: 面 -->
+        <path
+            android:pathData="M 288.8,792.0 L 166.2,417.0 Q 160,398 179.0,391.8 L 331.0,342.2 Q 350,336 356.2,355.0 L 478.8,730.0 Q 485,749 466.0,755.2 L 314.0,804.8 Q 295,811 288.8,792.0 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="512"
+                    android:startY="142"
+                    android:endX="512"
+                    android:endY="811">
+                    <item android:offset="0" android:color="#E6F7B02E" />
+                    <item android:offset="1" android:color="#E6D07B46" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- 左下: 内側の縁の光 -->
+        <path
+            android:pathData="M 185.3,395.0 L 327.8,348.5 Q 346.8,342.3 353.0,361.3 L 472.5,726.8 Q 478.7,745.8 459.7,752.0 L 317.2,798.5 Q 298.2,804.7 292.0,785.7 L 172.5,420.2 Q 166.3,401.2 185.3,395.0 Z"
+            android:strokeColor="#9EFFCE9A"
+            android:strokeWidth="9.0" />
+        <!-- 下: 面 -->
+        <path
+            android:pathData="M 709,811 L 315,811 Q 295,811 295,791 L 295,631 Q 295,611 315,611 L 709,611 Q 729,611 729,631 L 729,791 Q 729,811 709,811 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="512"
+                    android:startY="142"
+                    android:endX="512"
+                    android:endY="811">
+                    <item android:offset="0" android:color="#E6F7B02E" />
+                    <item android:offset="1" android:color="#E6D07B46" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- 下: 内側の縁の光 -->
+        <path
+            android:pathData="M 300.0,786.0 L 300.0,636.0 Q 300.0,616.0 320.0,616.0 L 704.0,616.0 Q 724.0,616.0 724.0,636.0 L 724.0,786.0 Q 724.0,806.0 704.0,806.0 L 320.0,806.0 Q 300.0,806.0 300.0,786.0 Z"
+            android:strokeColor="#9EFFCE9A"
+            android:strokeWidth="9.0" />
+        <!-- 右下: 面 -->
+        <path
+            android:pathData="M 857.8,417.0 L 735.2,792.0 Q 729,811 710.0,804.8 L 558.0,755.2 Q 539,749 545.2,730.0 L 667.8,355.0 Q 674,336 693.0,342.2 L 845.0,391.8 Q 864,398 857.8,417.0 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="512"
+                    android:startY="142"
+                    android:endX="512"
+                    android:endY="811">
+                    <item android:offset="0" android:color="#E6F7B02E" />
+                    <item android:offset="1" android:color="#E6D07B46" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- 右下: 内側の縁の光 -->
+        <path
+            android:pathData="M 706.8,798.5 L 564.3,752.0 Q 545.3,745.8 551.5,726.8 L 671.0,361.3 Q 677.2,342.3 696.2,348.5 L 838.7,395.0 Q 857.7,401.2 851.5,420.2 L 732.0,785.7 Q 725.8,804.7 706.8,798.5 Z"
+            android:strokeColor="#9EFFCE9A"
+            android:strokeWidth="9.0" />
+        <!-- 右上: 面 -->
+        <path
+            android:pathData="M 528.2,153.8 L 847.8,386.2 Q 864,398 852.2,414.2 L 757.8,543.8 Q 746,560 729.8,548.2 L 410.2,315.8 Q 394,304 405.8,287.8 L 500.2,158.2 Q 512,142 528.2,153.8 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="512"
+                    android:startY="142"
+                    android:endX="512"
+                    android:endY="811">
+                    <item android:offset="0" android:color="#E6F7B02E" />
+                    <item android:offset="1" android:color="#E6D07B46" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- 右上: 内側の縁の光 -->
+        <path
+            android:pathData="M 845.2,415.3 L 756.7,536.8 Q 744.9,553.0 728.7,541.2 L 417.2,314.7 Q 401.0,302.9 412.8,286.7 L 501.3,165.2 Q 513.1,149.0 529.3,160.8 L 840.8,387.3 Q 857.0,399.1 845.2,415.3 Z"
+            android:strokeColor="#9EFFCE9A"
+            android:strokeWidth="9.0" />
+        <!-- 左上（白）: 面 -->
+        <path
+            android:pathData="M 495.8,153.8 L 176.2,386.2 Q 160,398 171.8,414.2 L 266.2,543.8 Q 278,560 294.2,548.2 L 613.8,315.8 Q 630,304 618.2,287.8 L 523.8,158.2 Q 512,142 495.8,153.8 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="512"
+                    android:startY="100"
+                    android:endX="512"
+                    android:endY="950">
+                    <item android:offset="0" android:color="#FFFFFFFF" />
+                    <item android:offset="1" android:color="#99FFFFFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- 左上（白）: 内側の縁の光 -->
+        <path
+            android:pathData="M 178.8,415.3 L 267.3,536.8 Q 279.1,553.0 295.3,541.2 L 606.8,314.7 Q 623.0,302.9 611.2,286.7 L 522.7,165.2 Q 510.9,149.0 494.7,160.8 L 183.2,387.3 Q 167.0,399.1 178.8,415.3 Z"
+            android:strokeColor="#40FFFFFF"
+            android:strokeWidth="9.0" />
+        <!-- 右上の破片（白）: 面 -->
+        <path
+            android:pathData="M 1004.1,-103.8 L 650.6,72.8 Q 632.6,81.6 641.7,99.6 L 713.4,243.0 Q 722.3,260.9 740.2,252.1 L 1093.8,75.4 Q 1111.7,66.6 1102.7,48.5 L 1031.0,-94.8 Q 1022.1,-112.8 1004.1,-103.8 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="512"
+                    android:startY="100"
+                    android:endX="512"
+                    android:endY="950">
+                    <item android:offset="0" android:color="#FFFFFFFF" />
+                    <item android:offset="1" android:color="#99FFFFFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- 右上の破片（白）: 内側の縁の光 -->
+        <path
+            android:pathData="M 648.3,101.7 L 715.6,236.3 Q 724.5,254.2 742.4,245.3 L 1087.1,73.3 Q 1105.0,64.4 1096.0,46.5 L 1028.8,-88.2 Q 1019.9,-106.1 1002.0,-97.2 L 657.2,74.9 Q 639.3,83.8 648.3,101.7 Z"
+            android:strokeColor="#40FFFFFF"
+            android:strokeWidth="9.0" />
+        <!-- 左下の破片（白）: 面 -->
+        <path
+            android:pathData="M 51.3,510.7 L -223.6,794.5 Q -237.5,808.9 -223.2,822.8 L -107.9,934.2 Q -93.5,948.2 -79.5,933.8 L 195.3,649.9 Q 209.3,635.5 194.9,621.5 L 79.6,510.2 Q 65.3,496.2 51.3,510.7 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="512"
+                    android:startY="100"
+                    android:endX="512"
+                    android:endY="950">
+                    <item android:offset="0" android:color="#FFFFFFFF" />
+                    <item android:offset="1" android:color="#99FFFFFF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- 左下の破片（白）: 内側の縁の光 -->
+        <path
+            android:pathData="M -216.0,822.7 L -108.0,927.2 Q -93.6,941.1 -79.7,926.7 L 188.3,650.0 Q 202.2,635.6 187.8,621.7 L 79.8,517.2 Q 65.4,503.3 51.5,517.7 L -216.5,794.4 Q -230.4,808.8 -216.0,822.7 Z"
+            android:strokeColor="#40FFFFFF"
+            android:strokeWidth="9.0" />
+    </group>
+</vector>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ダーク時の窓の地色。これが無いと Compose の描画前に白い板が一瞬見える。 -->
+<resources>
+    <style name="Theme.HandballRecorder" parent="@android:style/Theme.Material.NoActionBar" />
+</resources>

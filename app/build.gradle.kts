@@ -1,6 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    // 画面は Jetpack Compose。版はルートの build.gradle.kts が持つ（Kotlin と同一）。
+    id("org.jetbrains.kotlin.plugin.compose")
     // Room の DAO 実装生成（kapt ではなく KSP）。
     id("com.google.devtools.ksp")
 }
@@ -30,11 +32,14 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            // 実測用に release も端末へ入れたいので debug 鍵で署名する（配布物ではない）。
-            // **debug ビルドで性能を測らないこと**: debuggable なプロセスでは ART が
-            // -Xcheck:jni を有効化し、JNI 往復ごとに検査が入って桁が変わる（README 参照）。
-            signingConfig = signingConfigs.getByName("debug")
+            // 署名設定は置かない。ここは APK を直配布するリポジトリなので、debug 鍵で
+            // 署名された release が「配布できる成果物」に見えてしまうほうが有害
+            // （配布用の署名鍵は Releases を出すときに別途用意する）。
         }
+    }
+
+    buildFeatures {
+        compose = true
     }
 
     compileOptions {
@@ -77,10 +82,30 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.17.0@aar")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
+    // ── 画面（Jetpack Compose / Material 3）──
+    // BOM が版をまとめて決めるのは **androidx.compose.* だけ**。activity / lifecycle /
+    // navigation は BOM の管轄外なので個別に版を書く（README のバージョン表と対応）。
+    implementation(platform("androidx.compose:compose-bom:2025.06.01"))
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    // @Preview のレンダラは debug ビルドにだけ入れる（release へ持ち込むと無駄に太る）。
+    debugImplementation("androidx.compose.ui:ui-tooling")
+
+    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.1")
+    implementation("androidx.navigation:navigation-compose:2.9.0")
+
     // ── 永続化（シェルの責務。コアは DB を所有しない）──
     implementation("androidx.room:room-runtime:2.7.2")
     implementation("androidx.room:room-ktx:2.7.2")
     ksp("androidx.room:room-compiler:2.7.2")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+
+    // ── 単体テスト（JVM 上で回る。Android 実機 / エミュレータは要らない）──
+    // CI の `check` が `:app:testDebugUnitTest` を回すので、テストが 0 件のままにならないよう
+    // ここで実行系を宣言する。**アプリ本体の依存は増やさない**（testImplementation は APK に入らない）。
+    testImplementation("junit:junit:4.13.2")
 }
