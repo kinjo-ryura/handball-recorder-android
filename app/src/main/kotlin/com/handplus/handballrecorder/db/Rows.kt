@@ -65,19 +65,20 @@ data class FactRow(
     val matchId: String,
     val recordedAtEpochSecond: Long,
     val recordedAtNano: Int,
-    /** "play" | "phaseStart" | "stoppage" */
+    /** "play" | "phaseStart" | "stoppage" | "possession" */
     val payloadKind: String,
-    // ── 代表 anchor（play は anchor、control は startAnchor）──
-    /** "matchClock" | "videoClock" | "both" */
+    // ── 代表 anchor（play / possession は anchor、control は startAnchor）──
+    /** "MATCH_CLOCK" | "VIDEO_CLOCK" | "BOTH"（FactAnchor の Kotlin 側 enum 名に相当） */
     val startAnchorKind: String,
     val startMatchSeconds: Double?,
     val startVideoSeconds: Double?,
-    // ── 終了 anchor（phaseStart は必須 / stoppage は任意 / play は常に null）──
+    // ── 終了 anchor（phaseStart は必須 / stoppage・possession は任意 / play は常に null）──
     val endAnchorKind: String?,
     val endMatchSeconds: Double?,
     val endVideoSeconds: Double?,
     // ── play 固有 ──
     val playKind: String?,
+    /** play は任意 / possession は必須（ドメインの不変条件） */
     val teamId: String?,
     val playerId: String?,
     val relatedPlayerId: String?,
