@@ -12,6 +12,7 @@ import io.github.kinjoryura.handballtoolkit.PlayFact
 import io.github.kinjoryura.handballtoolkit.ResolvedFact
 import io.github.kinjoryura.handballtoolkit.VideoClock
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -27,6 +28,9 @@ import java.util.UUID
  * - **境界ちょうど**（進行は `>=` / 読み飛ばしは `>` の非対称）
  * - **重なり**（シークせず index だけ進める。親リポ #237）
  * - **手動で先へ飛ばされた場合**（終わっていない最初の後続まで一度に送る）
+ *
+ * **対象範囲だけは iOS を正典とし web デモと違う**（goal / shotMissed / freeNote の 3 種。
+ * カード類は載せない）。ここが緩むと「一覧に ▶ が付いているのに再生されない行」ができる。
  */
 class ClipProgressionTest {
 
@@ -62,15 +66,53 @@ class ClipProgressionTest {
     }
 
     @Test
-    fun `得点以外の play fact も対象にする`() {
-        // ハイライトは記録の過半が freeNote の回もある。得点に絞るとシーンの大半が消える。
+    fun `得点 シュートミス メモの 3 種を対象にする`() {
+        // iOS `PlayerShotsPlaybackControllerV2` の「試合全体のハイライト」init と同じ範囲。
+        // ハイライトは記録の過半が freeNote の回もあるので、得点だけに絞るとシーンの大半が消える。
         val facts = listOf(
             play(video = 10.0, kind = PlayEventKind.GOAL),
             play(video = 20.0, kind = PlayEventKind.SHOT_MISSED),
             play(video = 30.0, kind = PlayEventKind.FREE_NOTE),
-            play(video = 40.0, kind = PlayEventKind.TWO_MINUTE_SUSPENSION),
         )
-        assertEquals(4, ClipProgression.clips(facts).size)
+        assertEquals(listOf(6.0, 16.0, 26.0), ClipProgression.clips(facts).map { it.startSeconds })
+    }
+
+    @Test
+    fun `カード類はクリップにしない`() {
+        // 通し再生で見返したいのは名場面で、罰則はその場面ではない（iOS に合わせた判断）。
+        // **シーン一覧には行として出る**が、▶ は付かず「N シーン」にも数えない。
+        val facts = listOf(
+            play(video = 10.0, kind = PlayEventKind.YELLOW_CARD),
+            play(video = 20.0, kind = PlayEventKind.TWO_MINUTE_SUSPENSION),
+            play(video = 30.0, kind = PlayEventKind.RED_CARD),
+        )
+        assertEquals(emptyList<Clip>(), ClipProgression.clips(facts))
+    }
+
+    @Test
+    fun `対象外を挟んでもクリップは詰めて並ぶ`() {
+        // 一覧は 5 行だがクリップは 3 本。**行番号とクリップ index はここでずれる。**
+        val facts = listOf(
+            play(video = 10.0, kind = PlayEventKind.GOAL),
+            play(video = 20.0, kind = PlayEventKind.YELLOW_CARD),
+            play(video = 30.0, kind = PlayEventKind.SHOT_MISSED),
+            play(video = 40.0, kind = PlayEventKind.RED_CARD),
+            play(video = 50.0, kind = PlayEventKind.FREE_NOTE),
+        )
+        assertEquals(
+            listOf(6.0, 26.0, 46.0),
+            ClipProgression.clips(facts).map { it.startSeconds },
+        )
+    }
+
+    @Test
+    fun `対象判定は 3 種だけを通す`() {
+        assertTrue(ClipProgression.isPlaybackTarget(PlayEventKind.GOAL))
+        assertTrue(ClipProgression.isPlaybackTarget(PlayEventKind.SHOT_MISSED))
+        assertTrue(ClipProgression.isPlaybackTarget(PlayEventKind.FREE_NOTE))
+        assertFalse(ClipProgression.isPlaybackTarget(PlayEventKind.YELLOW_CARD))
+        assertFalse(ClipProgression.isPlaybackTarget(PlayEventKind.TWO_MINUTE_SUSPENSION))
+        assertFalse(ClipProgression.isPlaybackTarget(PlayEventKind.RED_CARD))
     }
 
     @Test

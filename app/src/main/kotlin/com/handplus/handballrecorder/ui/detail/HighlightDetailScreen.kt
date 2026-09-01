@@ -61,6 +61,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * - **得点タイムラインではなくシーン一覧（1 列）**。ハイライトは記録の過半が `freeNote`
  *   （ナイスパス等）の回もあり、得点に絞ると大半のシーンが消える。全 play fact を種別
  *   チップつきで並べる
+ * - **一覧の行数と通し再生のシーン数は一致しない**。通し再生に載るのは iOS と同じ
+ *   goal / shotMissed / freeNote の 3 種（`ClipProgression.isPlaybackTarget`）で、
+ *   カード類は**行としては出すが ▶ を出さず、「すべて再生（N シーン）」の N にも数えない**。
+ *   タップの単発シークだけは効く。強調行と `index` の対応は必ず `factId` で取ること
+ *   （[indexOfFact]）
  * - **両サイド表示が成立しない**。片チームの選手だけを取り上げるのでアウェイ列が常に空になり、
  *   phase を持たないので中央の試合時計も常に空になる
  * - **スコアを出さない**。`summary.homeScore` は試合スコアではなく「このハイライトに写っている
@@ -172,9 +177,9 @@ private fun HighlightDetailReady(
     // 再生中のシーンが画面外にあると、強調しても見えない。行が変わったら一覧を寄せる
     // （web デモの `markPlayingRow` がカード内をスクロールするのと同じ狙い）。
     // **利用者の操作中は動かさない** — 通し再生が index を進めたときだけ走る。
-    val playingIndex = playbackState.playingFactId
-        ?.let { factId -> content.scenes.indexOfFirst { it.factId == factId } }
-        ?.takeIf { it >= 0 }
+    // **クリップの index をそのまま行番号に使わないこと。** 一覧はカード類のぶんだけ行が
+    // 多いので、`factId` で引き当てる（[indexOfFact]）。
+    val playingIndex = content.scenes.indexOfFact(playbackState.playingFactId)
     LaunchedEffect(playingIndex) {
         playingIndex?.let { listState.animateScrollToItem(it + SCENE_ITEM_OFFSET) }
     }
@@ -215,6 +220,10 @@ private fun HighlightDetailReady(
                 // **web デモとは意図的に違う。** あちらは行タップが常に通し再生の入口だが、
                 // このアプリは「1 シーンだけ確かめる」を単発シークで残している
                 // （3 秒手前 = PlaybackOffsets.SEEK_OFFSET_SECONDS。通し再生の lead-in 4 秒とは別物）。
+                //
+                // **通し再生の対象外（カード類）は再生中でも単発シークになる** — クリップ列に
+                // 居ないので index が -1 に落ち、下の else へ流れる。ここに専用の分岐を足さない
+                // こと（判定が 2 か所に増える）。
                 val index = content.clips.indexOfFirst { it.factId == scene.factId }
                 if (playbackState.isPlaying && index >= 0) {
                     playback.start(index)
@@ -263,7 +272,9 @@ private fun HighlightHeading(title: String, subtitle: String) {
 /**
  * 「すべて再生（N シーン）」／再生中は「停止（n / N）」。
  *
- * **N は重なりでも減らない**（クリップ列をマージしないので、シーン一覧の行と 1:1 のまま）。
+ * **N はクリップ数であって、シーン一覧の行数ではない。** 通し再生に載らないカード類は
+ * 数えない（`ClipProgression.isPlaybackTarget`）。一方 **重なりでも N は減らない**
+ * （クリップ列をマージしないので、対象の行とは 1:1 のまま）。
  */
 @Composable
 private fun PlayAllButton(
@@ -327,6 +338,10 @@ private fun HighlightBody(
  *
  * 動画位置を持たない fact も**行としては出す**（記録された事実は必ず 1 行にする）。
  * その行は押せず、時刻と ▶ の欄が空になる。
+ *
+ * **▶ は「通し再生に入る行」の印**（[HighlightScene.isPlaybackTarget]）。カード類は
+ * 動画位置を持っていても ▶ を出さない — 押せば単発でそこへ飛ぶが、「すべて再生」では
+ * 流れないので、印を出すと嘘になる。**押せるかどうか（`clickable`）とは別の条件**。
  */
 @Composable
 private fun SceneRow(scene: HighlightScene, isPlaying: Boolean, onTap: () -> Unit) {
@@ -360,9 +375,9 @@ private fun SceneRow(scene: HighlightScene, isPlaying: Boolean, onTap: () -> Uni
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        // 押せる行の目印。押せない行にも空欄を置いて時刻の列を揃える（web デモと同じ）。
+        // 通し再生に入る行の目印。印の無い行にも空欄を置いて時刻の列を揃える（web デモと同じ）。
         Text(
-            text = if (seekable) "▶" else "",
+            text = if (scene.isPlaybackTarget) "▶" else "",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.primary,
         )

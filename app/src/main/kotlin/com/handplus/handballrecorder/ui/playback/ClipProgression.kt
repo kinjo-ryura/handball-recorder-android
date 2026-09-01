@@ -2,6 +2,7 @@ package com.handplus.handballrecorder.ui.playback
 
 import io.github.kinjoryura.handballtoolkit.FactId
 import io.github.kinjoryura.handballtoolkit.MatchFactPayload
+import io.github.kinjoryura.handballtoolkit.PlayEventKind
 import io.github.kinjoryura.handballtoolkit.ResolvedFact
 import kotlin.math.max
 
@@ -45,11 +46,16 @@ sealed interface ClipStep {
 
 /**
  * 通し再生の進行判定。**iOS `PlayerShotsPlaybackControllerV2` と web デモ `demo.js` の
- * `playAllTick` の移植で、規則を 1 つも変えていない。**
+ * `playAllTick` の移植で、進行の規則（クリップ長・ポーリング・ガード窓・重なり）を
+ * 1 つも変えていない。**
  *
  * 3 者は「片方を変えたらもう片方も揃える」という取り決めで結ばれている
  * （iOS の `advance(currentVideoTime:)` の doc / web デモ README「通し再生（すべて再生）」）。
  * **ここを直すときは iOS と web デモも直すこと。**
+ *
+ * **ただし「何をクリップにするか」だけは iOS を正典とし、web デモとは違う**
+ * （[isPlaybackTarget] / [clips]）。あちらは全 play fact を対象にするが、こちらは iOS と
+ * 同じ goal / shotMissed / freeNote の 3 種に絞る。
  *
  * 副作用（シーク・一時停止・ポーリング）を持たない純関数にしてあるのは、境界の扱いを
  * 単体テストで固定するため（`ClipProgressionTest`）。実機・エミュレータを起こさずに
@@ -68,27 +74,45 @@ object ClipProgression {
     const val SEEK_SETTLE_WINDOW_SECONDS: Double = 1.0
 
     /**
+     * 通し再生に載せる記録種別か。**正典は iOS**（`PlayerShotsPlaybackControllerV2` の
+     * 「試合全体のハイライト（goal / shotMissed / freeNote）を時系列順で連続再生する init」）。
+     *
+     * 得点・シュートミス・メモの 3 種だけを繋いで流し、**カード類（イエロー / 2 分間退場 /
+     * レッド）は載せない**。通し再生で見返したいのは名場面で、罰則はその場面ではないため。
+     *
+     * **web デモの `buildClips` は全 play fact を対象にしていて、ここだけ 3 者が揃っていない。**
+     * 揃える先を iOS にするのは利用者判断（2026-09-01）。web デモに合わせ直さないこと。
+     *
+     * `when` はコアの enum に対して網羅なので、**種別が増えればコンパイルが落ちて気付ける**
+     * （`PlayEventKind.label` と同じ理由で `Set` を持たない）。
+     */
+    fun isPlaybackTarget(kind: PlayEventKind): Boolean = when (kind) {
+        PlayEventKind.GOAL, PlayEventKind.SHOT_MISSED, PlayEventKind.FREE_NOTE -> true
+        PlayEventKind.YELLOW_CARD, PlayEventKind.TWO_MINUTE_SUSPENSION, PlayEventKind.RED_CARD -> false
+    }
+
+    /**
      * fact 列 → クリップ列。
      *
-     * - 対象は**全 play fact**（得点に絞らない）。ハイライトは記録の過半が `freeNote`
-     *   （ナイスパス等）の回もあるため。web デモの `buildClips` と同じ範囲で、
-     *   **シーン一覧に出る行とちょうど一致する**（「n / N」と行の 1:1 対応の根拠）。
-     *   iOS の `allHighlightsOf` だけは `goal` / `shotMissed` / `freeNote` の 3 種に
-     *   絞っているが、**あちらは「すべて再生」が別画面でシーン一覧を持たない**ので
-     *   1:1 の要請が無い。カード類（イエロー / 2 分 / レッド）を落とすと、こちらでは
-     *   一覧に出ている行が通し再生から静かに消える（**意図的な差分**）
-     * - **動画位置を持たない fact は載せない**（飛び先が無い）。シーン一覧には行として出るが、
-     *   押せない行になる
+     * - 対象は [isPlaybackTarget] を満たす play fact（**goal / shotMissed / freeNote の 3 種**）。
+     *   カード類は落とす
+     * - **動画位置を持たない fact は載せない**（飛び先が無い）
      * - 並びは `startSeconds` 昇順。**入力（`orderedFacts`）が既に動画時刻順でも省かない** —
      *   ハイライトの `resolvedMatchClock` は全 fact で null になる前提だが、そうでない
      *   データが来たときに進行判定の前提（昇順）が崩れないようにする
      *
+     * **シーン一覧（`HighlightScene`）はこれより行が多い。** 一覧には全 play fact を並べ、
+     * 対象外の行は ▶ を出さないことで「押しても通し再生には入らない」を見せる。つまり
+     * **「n / N」の N（= クリップ数）は一覧の行数と一致しない**ので、強調行と `index` の
+     * 対応は**必ず `factId` で取ること**（行番号で引き当てるとカードの数だけずれる）。
+     *
      * **クリップ列はマージしない。** 重なっていても 1 本に畳まないのは、「n / N」の N を
-     * 減らさず、シーン一覧の行と 1:1 で対応させ続けるため（iOS / web デモと同じ）。
+     * 減らさず、対象の行と 1:1 で対応させ続けるため（iOS / web デモと同じ）。
      */
     fun clips(orderedFacts: List<ResolvedFact>): List<Clip> = orderedFacts
         .mapNotNull { resolved ->
-            if (resolved.fact.payload !is MatchFactPayload.Play) return@mapNotNull null
+            val payload = resolved.fact.payload as? MatchFactPayload.Play ?: return@mapNotNull null
+            if (!isPlaybackTarget(payload.v1.kind)) return@mapNotNull null
             val video = resolved.resolvedVideoClock ?: return@mapNotNull null
             Clip(
                 factId = resolved.fact.id,
