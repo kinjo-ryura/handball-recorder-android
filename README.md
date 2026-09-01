@@ -40,19 +40,31 @@ DB ハンドルとトランザクション境界、素朴な CRUD、ID / 時刻�
 **コアはユーザー向け文言を一切持たない**（エラーはコードとパラメータのみ）。日本語の文言は
 すべてこのリポジトリ側にある。
 
+## 現状
+
+**シード投入直後**で、画面はまだ handball-toolkit の
+[`examples/android`](https://github.com/kinjo-ryura/handball-toolkit/tree/main/examples/android)
+（シェル契約の参照実装）のままです。Room の DB 層と 15 メソッドの write repository は動きますが、
+上のスコープにある一覧・詳細画面と YouTube 再生はこれから実装します。
+
 ## ビルド
 
 前提:
 
-- JDK 21
-- Android SDK（`ANDROID_HOME` を設定するか `local.properties` に `sdk.dir` を書く）
-- ABI は **arm64-v8a 単独**（[ADR 0006](https://github.com/kinjo-ryura/handball-toolkit/blob/main/docs/adr/0006-android-distribution.md)）。
-  エミュレータを使うなら arm64-v8a の AVD が要る
+- **JDK 21**
+- **Android SDK** — この repo は SDK を持たない（[ADR 0006](https://github.com/kinjo-ryura/handball-toolkit/blob/main/docs/adr/0006-android-distribution.md) 決定 1）。
+  `ANDROID_HOME` を設定するか `local.properties` に書く:
+
+  ```sh
+  echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties   # コミットしない
+  ```
+
+- ABI は **arm64-v8a 単独**（ADR 0006 決定 5）。エミュレータを使うなら同 ABI の AVD が要る
 
 **Rust / NDK は要らない。** コアは `.aar` の中に `.so` として入っている。
 
 ```sh
-# コアの .aar を Releases から落とす
+# コアの .aar を Releases から落とす（app/libs/ はコミットしない）
 mkdir -p app/libs
 gh release download v0.5.0 --repo kinjo-ryura/handball-toolkit --pattern '*.aar' --dir app/libs
 
@@ -60,7 +72,34 @@ gh release download v0.5.0 --repo kinjo-ryura/handball-toolkit --pattern '*.aar'
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-`app/libs/` と `local.properties` はコミットしない。
+### nix を使う場合（任意）
+
+`flake.nix` が JDK と Gradle を供給する。**nix は必須ではない** — 上の `./gradlew` だけで完結する。
+
+```sh
+nix develop     # direnv なら direnv allow
+./gradlew :app:assembleDebug
+```
+
+**Gradle のバージョンを決めるのは wrapper（`gradle/wrapper/gradle-wrapper.properties`）で、
+flake ではない。** nix 環境でも `./gradlew` を使えば fork 先とまったく同じ Gradle で回る。
+flake の `gradle` を直接叩くこともできるが、その場合バージョンが二重管理になるので、
+devShell に入るたびに wrapper のピン留めと一致するかを検査して食い違いを警告する。
+
+### バージョンの対応関係
+
+| | バージョン | 備考 |
+|---|---|---|
+| Gradle | 8.14.4 | wrapper がピン留め（配布物の SHA-256 も固定） |
+| AGP | 8.11.1 | Gradle 8.13+ を要求 |
+| Kotlin | 2.1.21 | KSP と組で上げること |
+| KSP | 2.1.21-2.0.1 | Kotlin と完全一致が必要 |
+| Room | 2.7.2 | |
+| handball-toolkit | 0.5.0 | `app/libs/handball-toolkit-0.5.0.aar` |
+| JNA | 5.17.0（`@aar`） | **`.aar` は依存情報を運ばない**ので利用側で宣言する |
+| kotlinx-coroutines | 1.10.2 | 同上 |
+| compileSdk / targetSdk | 36 | `buildToolsVersion = "37.0.0"` を明示 |
+| minSdk | 24 | `java.time` を使うため `coreLibraryDesugaring` が要る |
 
 ## インストール（利用者向け）
 
