@@ -3,26 +3,14 @@ package com.handplus.handballrecorder
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.handplus.handballrecorder.ui.detail.HighlightDetailScreen
 import com.handplus.handballrecorder.ui.detail.MatchDetailScreen
 import com.handplus.handballrecorder.ui.list.MatchListScreen
 import com.handplus.handballrecorder.ui.theme.HandballRecorderTheme
@@ -82,66 +70,35 @@ fun HandballRecorderApp(navController: NavHostController = rememberNavController
             val kind = entry.arguments?.getString(Routes.ARG_KIND).orEmpty()
             val slug = entry.arguments?.getString(Routes.ARG_SLUG).orEmpty()
             val onBack = { navController.popBackStack(); Unit }
+            // **プレイヤーの寿命はこの行き先に紐づく。** ここで remember しておけば、
+            // 画面が破棄されるときに `WebView` も一緒に destroy される
+            // （`rememberYouTubePlayerController` の `DisposableEffect`）。
+            // `WebView` の生成自体は動画を読むまで遅延するので、動画なしの試合を
+            // 開いても Chromium の初期化も YouTube への通信も起きない。
+            //
+            // **試合とハイライトで同じ渡し方にしてある。** 片方だけ別の作り方にすると、
+            // 破棄の責任がどちらにあるのかが行き先ごとに変わる。
+            val player = rememberYouTubePlayerController()
             when (kind) {
-                Routes.KIND_HIGHLIGHT -> HighlightPlaceholderScreen(slug = slug, onBack = onBack)
+                Routes.KIND_HIGHLIGHT -> HighlightDetailScreen(
+                    slug = slug,
+                    onBack = onBack,
+                    // 行タップ（通し再生が止まっているとき）→ 3 秒手前へ飛んで再生する。
+                    // 通し再生中の行タップはそのシーンからの再開になり、こちらは通らない。
+                    onSeek = player::seek,
+                    player = player,
+                )
+
                 // 未知の kind も試合として開く。slug の形が配信の規約に合わなければ
                 // `SampleFeed` が取りに行く前に弾き、「見つかりません」を出す。
-                else -> {
-                    // **プレイヤーの寿命はこの行き先に紐づく。** ここで remember しておけば、
-                    // 画面が破棄されるときに `WebView` も一緒に destroy される
-                    // （`rememberYouTubePlayerController` の `DisposableEffect`）。
-                    // `WebView` の生成自体は動画を読むまで遅延するので、動画なしの試合を
-                    // 開いても Chromium の初期化も YouTube への通信も起きない。
-                    val player = rememberYouTubePlayerController()
-                    MatchDetailScreen(
-                        slug = slug,
-                        onBack = onBack,
-                        // 行タップ → 記録された動画位置の 3 秒手前へ飛んで再生する。
-                        onSeek = player::seek,
-                        player = player,
-                    )
-                }
+                else -> MatchDetailScreen(
+                    slug = slug,
+                    onBack = onBack,
+                    // 行タップ → 記録された動画位置の 3 秒手前へ飛んで再生する。
+                    onSeek = player::seek,
+                    player = player,
+                )
             }
         }
-    }
-}
-
-/**
- * ハイライト詳細のプレースホルダ。中身（動画枠 / シーン一覧 / 「すべて再生」）は次のチャンク。
- *
- * 一覧のハイライトタブからここへ遷移できることまでが、このチャンクの範囲。
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HighlightPlaceholderScreen(slug: String, onBack: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("ハイライト詳細（未実装）") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("戻る") } },
-            )
-        },
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                "シーン一覧と「すべて再生」はこれから実装します。",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text("slug: $slug", style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun HighlightPlaceholderPreview() {
-    HandballRecorderTheme {
-        HighlightPlaceholderScreen(slug = "sample-highlight", onBack = {})
     }
 }

@@ -41,15 +41,43 @@ DB ハンドルとトランザクション境界、素朴な CRUD、ID / 時刻�
 
 ## 現状
 
-**一覧と試合詳細、そして YouTube 再生まで入った段階**です。シード（handball-toolkit の
+**見る専用 MVP は一通り揃っています。** シード（handball-toolkit の
 [`examples/android`](https://github.com/kinjo-ryura/handball-toolkit/tree/main/examples/android)）が
 持っていたデモ UI — ボタン 7 個でシェル契約の write 経路を踏む画面 — は、見る専用 MVP とは
 用途が逆なので捨てました。
 
-動くのは配信データの取得（`data/SampleFeed.kt`）、試合 / ハイライトの一覧（`ui/list/`。
-タブ 2 つ + 動画有無フィルタ）、試合詳細（`ui/detail/`。phase ごとのタイムラインと
-チーム別 / 前後半別 / 選手別スタッツ）、YouTube の再生と行タップからのシーク
-（`ui/video/`）まで。**残っているのはハイライト詳細（「すべて再生」を含む）**です。
+| 画面 / 機能 | 実装 |
+|---|---|
+| 配信データの取得（試合 / ハイライトの index と本体） | `data/SampleFeed.kt` |
+| 一覧（タブ 2 つ + 動画有無フィルタ） | `ui/list/` |
+| 試合詳細（phase ごとのタイムライン、チーム別 / 前後半別 / 選手別スタッツ） | `ui/detail/MatchDetailScreen.kt` |
+| ハイライト詳細（シーン一覧 + 「このハイライトの記録」） | `ui/detail/HighlightDetailScreen.kt` |
+| **通し再生（「すべて再生」）** | `ui/playback/` |
+| YouTube の再生・行タップからのシーク | `ui/video/` |
+
+**ハイライトは試合詳細と描画を分けてあります**（web デモと同じ理由）。ハイライトは記録の
+過半が「メモ」（ナイスパス等）の回もあるので得点タイムラインでは大半のシーンが消え、
+片チームの選手だけを取り上げるのでアウェイ列も試合時計も常に空になり、
+`summary.homeScore` は試合スコアではなく「そのハイライトに写っている得点数」になります。
+だから **1 列のシーン一覧**（全 play fact に種別チップ）と**選手別の記録だけ**を出し、
+見出しも「スタッツ」ではなく「このハイライトの記録」にしています。時刻は動画時間です
+（`resolvedMatchClock` は全 fact で null）。
+
+**通し再生（`ui/playback/`）は iOS の `PlayerShotsPlaybackControllerV2` と web デモの
+`playAllTick` の移植で、規則を 1 つも変えていません。** 各シーンを
+`videoClock − 4 秒 〜 videoClock + 2 秒` のクリップにし、再生位置を 250ms ごとに見て
+末尾を過ぎたら次へ進みます。**重なっているクリップにはシークしません**（lead-in +
+tail = 6 秒なので 6 秒未満の間隔は重なり、素直に飛ぶと巻き戻って同じ映像を二度流す。
+親リポ #237）。進行の判定は副作用を持たない純関数（`ClipProgression.step`）に切り出して
+あり、境界ちょうど・重なり・手動で先へ飛ばされた場合を単体テストで固定しています。
+**3 者は「片方を変えたらもう片方も揃える」取り決めです。**
+
+**行タップの 3 秒と通し再生の lead-in 4 秒は別の定数**です（`ui/playback/PlaybackOffsets.kt`）。
+「そのシーンへ飛ぶ」と「名場面を繋いで見る」で必要な助走が違うので、iOS も web デモも
+別々に持っています。混ぜないこと。なお**行タップの扱いは web デモと意図的に違い**、
+止まっているときは単発シーク（3 秒手前）、通し再生中はそのシーンからの再開になります。
+
+残っているのは配布まわり（署名鍵・APK 配布導線）と、下の「既知の制限」です。
 
 既知の制限: プレーヤーの**全画面ボタンは押しても何も起きません**（`WebChromeClient` の
 `onShowCustomView` を実装していないため）。ボタン自体は消しません — コントロールを隠すのは
@@ -107,6 +135,11 @@ YouTube の Android ライブラリは使わない。
 | `ui/video/PlayerReadiness.kt` | 準備状態の遷移（純関数） |
 | `ui/video/JsLiterals.kt` | JS へ渡す値のリテラル化（純関数） |
 | `ui/video/YouTubePlayerFrame.kt` | Compose への載せ方（`AndroidView` と破棄） |
+| `ui/playback/ClipPlaybackController.kt` | 通し再生。プレーヤーへは `ClipPlaybackTarget`（`seek` / `pause` / `currentTimeSeconds` の 3 つだけ）を通して触る |
+
+通し再生がプレーヤーに出す指示も **`YT.Player` の公式メソッド 1:1**（`seekTo` + `playVideo` /
+`pauseVideo` / `getCurrentTime`）に限ってある。**通し再生のためにコントロールを隠さないこと** —
+連続再生画面は `minimalControls` を使いたくなる場所だが、それは上の 1 点目に触れる。
 
 `org.json` を使わず JSON の decode を自前で持っているのは、**JVM 単体テストでは `org.json` が
 スタブ**（呼ぶと既定値を返すだけ）になり CI で検証できないため。依存を増やさずに

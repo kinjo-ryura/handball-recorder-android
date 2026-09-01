@@ -36,7 +36,7 @@ import kotlin.coroutines.resume
  * ## 触ってよい面（RMF）
  *
  * 使うのは **`YT.Player` の公式メソッドとイベントだけ**（`initPlayer` /
- * `cueVideoById` / `seekTo` / `playVideo` / `getCurrentTime` と 4 つのイベント）。
+ * `cueVideoById` / `seekTo` / `playVideo` / `pauseVideo` / `getCurrentTime` と 4 つのイベント）。
  * `document.querySelector('video')` のような内部 DOM アクセス、生の `postMessage`、
  * コントロールを隠す `playerVars` は使わない。詳細は README「YouTube 連携（RMF）」。
  *
@@ -146,13 +146,32 @@ class YouTubePlayerController(context: Context) : AutoCloseable {
     }
 
     /**
+     * 一時停止する（`YT.Player.pauseVideo`）。
+     *
+     * 呼ぶのは**通し再生が最後のクリップまで見終わったとき**だけ
+     * （[com.handplus.handballrecorder.ui.playback.ClipPlaybackController]）。通し再生の
+     * 「停止」では呼ばない — 同じ画面にプレイヤーが残るので、そこで勝手に止めると
+     * 行タップからの再開が二重操作になる（web デモの `stopPlayAll` / `finishPlayAll` と同じ分け方）。
+     *
+     * プレイヤーが出来ていなければ何もしない（**予約しない** — [seek] と違い、
+     * 後から効かせて嬉しい操作ではない）。
+     */
+    fun pause() {
+        runOnMain {
+            if (isDestroyed) return@runOnMain
+            if (!_state.value.readiness.isLoaded) return@runOnMain
+            evaluate("player.pauseVideo()")
+        }
+    }
+
+    /**
      * 現在の再生位置（秒）。**位置が着地していなければ null。**
      *
      * cued / unstarted の `getCurrentTime()` は 0 を返すが、それは「動画の 0 秒地点」ではない
      * （iOS #98）。[PlayerReadiness.Positioned] 未満で null を返すのはそのため。
      *
-     * 次のチャンクの通し再生が 250ms 間隔で呼ぶ。1 回の呼び出しは
-     * `evaluateJavascript` 1 往復で、結果は main スレッドで受ける。
+     * ハイライトの通し再生（[com.handplus.handballrecorder.ui.playback.ClipPlaybackController]）が
+     * 250ms 間隔で呼ぶ。1 回の呼び出しは `evaluateJavascript` 1 往復で、結果は main スレッドで受ける。
      */
     suspend fun currentTimeSeconds(): Double? {
         if (!_state.value.readiness.allowsPositionReads) return null
