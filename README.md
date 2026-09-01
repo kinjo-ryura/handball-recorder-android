@@ -41,21 +41,81 @@ DB ハンドルとトランザクション境界、素朴な CRUD、ID / 時刻�
 
 ## 現状
 
-**一覧と試合詳細まで入った段階**です。シード（handball-toolkit の
+**一覧と試合詳細、そして YouTube 再生まで入った段階**です。シード（handball-toolkit の
 [`examples/android`](https://github.com/kinjo-ryura/handball-toolkit/tree/main/examples/android)）が
 持っていたデモ UI — ボタン 7 個でシェル契約の write 経路を踏む画面 — は、見る専用 MVP とは
 用途が逆なので捨てました。
 
 動くのは配信データの取得（`data/SampleFeed.kt`）、試合 / ハイライトの一覧（`ui/list/`。
 タブ 2 つ + 動画有無フィルタ）、試合詳細（`ui/detail/`。phase ごとのタイムラインと
-チーム別 / 前後半別 / 選手別スタッツ）まで。**残っているのは YouTube 再生
-（動画枠はプレースホルダのまま。シークの受け口 `onSeek` だけ用意してある）と
-ハイライト詳細（「すべて再生」を含む）**です。
+チーム別 / 前後半別 / 選手別スタッツ）、YouTube の再生と行タップからのシーク
+（`ui/video/`）まで。**残っているのはハイライト詳細（「すべて再生」を含む）**です。
+
+既知の制限: プレーヤーの**全画面ボタンは押しても何も起きません**（`WebChromeClient` の
+`onShowCustomView` を実装していないため）。ボタン自体は消しません — コントロールを隠すのは
+RMF に触れるからで、対応は別途入れます。
 
 **Room の DB 層（`db/`）と 15 メソッドの write repository（`RoomWriteRepositories.kt`）は
 残してあります。** 見る専用 MVP は端末に保存しないのでどちらも通りませんが、記録機能を
 足すときには必ず要るもので、しかも**公開できるシェル契約の参照実装はこれだけ**だからです
 （handball-toolkit 側の `examples/android` と対になる）。
+
+## YouTube 連携（RMF）
+
+動画は **`WebView` にローカル HTML（`app/src/main/assets/youtube_player.html`）を読み込み、
+公式の [IFrame Player API](https://developers.google.com/youtube/iframe_api_reference?hl=ja)
+（`YT.Player`）で制御**する。iOS 版とまったく同じ方式で、これは
+[RMF（Required Minimum Functionality）](https://developers.google.com/youtube/terms/required-minimum-functionality?hl=ja)
+に適合させるための選択でもある（`WebView` は許可されたクライアントとして明記されており、
+ローカル HTML に baseUrl を与えて読む形は RMF が案内する実装そのもの）。
+YouTube の Android ライブラリは使わない。
+
+### やってはいけないこと（変更時はここを読み直す）
+
+1. **プレーヤーのコントロールを隠さない。** `initPlayer` の `minimalControls`
+   （`controls: 0` / `disablekb` / `fs: 0` / `iv_load_policy` / `modestbranding` を一括で立てる）は
+   iOS から形だけ持ち込んであるが、**ネイティブ側は常に `false` を渡す**。単独で有効にしない。
+2. **YouTube の UI・attribution を覆うオーバーレイを乗せない。** 再生できないときの注記も、
+   枠の上ではなく**下**に出している。
+3. **広告やリンクをブロックしない。**
+4. **音声だけを抜き出して再生しない。**
+5. **`YT.Player` の公式メソッドとイベントだけを使う。** `document.querySelector('video')` の
+   ような内部 DOM アクセスや、低レベルの `postMessage` を直接叩くのは規約違反。
+
+出典: [RMF](https://developers.google.com/youtube/terms/required-minimum-functionality?hl=ja) ・
+[IFrame Player API](https://developers.google.com/youtube/iframe_api_reference?hl=ja) ・
+[Player Parameters](https://developers.google.com/youtube/player_parameters?hl=ja) ・
+[Developer Policies](https://developers.google.com/youtube/terms/developer-policies?hl=ja)
+
+### baseUrl と origin は app-origin にする（実害の話）
+
+`loadDataWithBaseURL` の baseUrl と `playerVars.origin` には、applicationId から組んだ
+**`https://com.handplus.handballrecorder`** を渡す。
+
+**ここを `http://127.0.0.1` 系や `file://` にすると、公開 URL でなら再生できる動画が
+`onError` 150 で弾かれる。** 2026-08-22 に web デモ側で実測した挙動で、それまで 1 か月ものあいだ
+「投稿者が埋め込みを無効化しているらしい」と誤診していた。**規約適合と実害回避が同じ答えになる**
+数少ない場所なので、動作確認のためであってもここを書き換えないこと。
+
+### 実装の地図
+
+| ファイル | 役割 |
+|---|---|
+| `app/src/main/assets/youtube_player.html` | ホスト HTML。iOS の同名ファイルからの移植で、**変えたのは JS → ネイティブの送信口だけ**（`window.webkit.messageHandlers.ytEvent` → `window.AndroidYouTube`） |
+| `ui/video/YouTubePlayerController.kt` | `WebView` の所有・JS の評価・`@JavascriptInterface` の受け口 |
+| `ui/video/YouTubeBridge.kt` | 届いた JSON を 4 種のイベントへ decode（純関数） |
+| `ui/video/PlayerReadiness.kt` | 準備状態の遷移（純関数） |
+| `ui/video/JsLiterals.kt` | JS へ渡す値のリテラル化（純関数） |
+| `ui/video/YouTubePlayerFrame.kt` | Compose への載せ方（`AndroidView` と破棄） |
+
+`org.json` を使わず JSON の decode を自前で持っているのは、**JVM 単体テストでは `org.json` が
+スタブ**（呼ぶと既定値を返すだけ）になり CI で検証できないため。依存を増やさずに
+`:app:testDebugUnitTest` で固定できることを優先した。
+
+**位置は「着地」してからでないと読まない。** cued / unstarted の `getCurrentTime()` は 0 を返すが、
+それは「動画の 0 秒地点に居る」ではない。準備状態を
+`unloaded → loading → ready → positioned` の**前進のみ**で持ち、`positioned` 未満では
+`currentTimeSeconds()` が null を返す。
 
 ## ビルド
 

@@ -26,6 +26,7 @@ import androidx.navigation.navArgument
 import com.handplus.handballrecorder.ui.detail.MatchDetailScreen
 import com.handplus.handballrecorder.ui.list.MatchListScreen
 import com.handplus.handballrecorder.ui.theme.HandballRecorderTheme
+import com.handplus.handballrecorder.ui.video.rememberYouTubePlayerController
 
 /**
  * 「見る専用」MVP の入口。画面はすべて Compose で、Activity は 1 枚だけ持つ
@@ -85,13 +86,21 @@ fun HandballRecorderApp(navController: NavHostController = rememberNavController
                 Routes.KIND_HIGHLIGHT -> HighlightPlaceholderScreen(slug = slug, onBack = onBack)
                 // 未知の kind も試合として開く。slug の形が配信の規約に合わなければ
                 // `SampleFeed` が取りに行く前に弾き、「見つかりません」を出す。
-                else -> MatchDetailScreen(
-                    slug = slug,
-                    onBack = onBack,
-                    // **シークの受け口だけ用意する。** 実体（YouTube の WebView）は次のチャンク。
-                    // ここで何もしないラムダを渡しておけば、行タップが落ちることはない。
-                    onSeek = {},
-                )
+                else -> {
+                    // **プレイヤーの寿命はこの行き先に紐づく。** ここで remember しておけば、
+                    // 画面が破棄されるときに `WebView` も一緒に destroy される
+                    // （`rememberYouTubePlayerController` の `DisposableEffect`）。
+                    // `WebView` の生成自体は動画を読むまで遅延するので、動画なしの試合を
+                    // 開いても Chromium の初期化も YouTube への通信も起きない。
+                    val player = rememberYouTubePlayerController()
+                    MatchDetailScreen(
+                        slug = slug,
+                        onBack = onBack,
+                        // 行タップ → 記録された動画位置の 3 秒手前へ飛んで再生する。
+                        onSeek = player::seek,
+                        player = player,
+                    )
+                }
             }
         }
     }

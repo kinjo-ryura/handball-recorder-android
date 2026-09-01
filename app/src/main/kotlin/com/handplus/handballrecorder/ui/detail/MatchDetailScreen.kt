@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -41,12 +40,16 @@ import com.handplus.handballrecorder.ui.labels.RateFormat
 import com.handplus.handballrecorder.ui.labels.displayName
 import com.handplus.handballrecorder.ui.labels.label
 import com.handplus.handballrecorder.ui.playback.PlaybackOffsets
+import com.handplus.handballrecorder.ui.video.YouTubePlayerController
+import com.handplus.handballrecorder.ui.video.YouTubePlayerFrame
 import io.github.kinjoryura.handballtoolkit.ControlFact
 import io.github.kinjoryura.handballtoolkit.MatchFactPayload
 import io.github.kinjoryura.handballtoolkit.PlayEventKind
 import io.github.kinjoryura.handballtoolkit.PlayFact
 import io.github.kinjoryura.handballtoolkit.PlayerStatLine
 import io.github.kinjoryura.handballtoolkit.ResolvedFact
+import io.github.kinjoryura.handballtoolkit.VideoProvider
+import io.github.kinjoryura.handballtoolkit.VideoSource
 import io.github.kinjoryura.handballtoolkit.awayAttempts
 import io.github.kinjoryura.handballtoolkit.homeAttempts
 import io.github.kinjoryura.handballtoolkit.scoringRate
@@ -57,16 +60,22 @@ import io.github.kinjoryura.handballtoolkit.shotAttempts
  *
  * **本文の描画を動画の有無に依存させない。** 配信 46 件の大半は PDF 由来のタイマー試合
  * （動画なし）で、動画が無いことは異常ではない。`videoSource` が null なら動画枠を出さず、
- * タイムラインとスタッツだけを描く。
+ * タイムラインとスタッツだけを描く。動画が**再生できなかった**ときも同じで、注記を足すだけで
+ * 本文はそのまま残す。
  *
- * @param onSeek 行タップで動画をその位置へ飛ばす受け口（秒）。**このチャンクでは受け口だけ**で、
- *   実体（YouTube の WebView）は次のチャンクで繋ぐ
+ * **動画枠だけはスクロールしない**（リストの上に固定する）。理由は
+ * [com.handplus.handballrecorder.ui.video.YouTubePlayerFrame] の説明を参照。
+ *
+ * @param onSeek 行タップで動画をその位置へ飛ばす（秒）。[player] の `seek` に繋ぐ
+ * @param player 動画を持つ試合で使うプレイヤー。null なら動画枠を出さない
+ *   （プレビューや、プレイヤーを用意できない経路のため）
  */
 @Composable
 fun MatchDetailScreen(
     slug: String,
     onBack: () -> Unit,
     onSeek: (Double) -> Unit,
+    player: YouTubePlayerController?,
     viewModel: MatchDetailViewModel = viewModel(factory = MatchDetailViewModel.factory(slug)),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -75,6 +84,7 @@ fun MatchDetailScreen(
         onBack = onBack,
         onRetry = viewModel::retry,
         onSeek = onSeek,
+        player = player,
     )
 }
 
@@ -86,6 +96,7 @@ fun MatchDetailScreen(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onSeek: (Double) -> Unit,
+    player: YouTubePlayerController?,
 ) {
     val title = (state as? MatchDetailUiState.Ready)?.content?.title ?: "試合"
     Scaffold(
@@ -118,20 +129,35 @@ fun MatchDetailScreen(
                     Button(onClick = onRetry) { Text("再試行") }
                 }
 
-                is MatchDetailUiState.Ready ->
+                is MatchDetailUiState.Ready -> Column(modifier = Modifier.fillMaxSize()) {
+                    // 1. 動画枠。**動画を持たない試合では丸ごと出さない**（配信 46 件の大半）。
+                    //
+                    // **リストの中ではなく上に固定する。** `LazyColumn` の item にすると
+                    // スクロールで item ごと破棄され、同じ `WebView` を別の親へ付け直す形に
+                    // なる。加えて、下のほうの行をタップしても飛び先が画面外になる。
+                    val source = playableVideoSource(state.content.videoSource)
+                    if (source != null && player != null) {
+                        YouTubePlayerFrame(controller = player, videoSource = source)
+                    }
                     MatchDetailContentList(content = state.content, onSeek = onSeek)
+                }
             }
         }
     }
 }
 
+/**
+ * このアプリで再生できる動画ソースだけを通す。
+ *
+ * `local` は iOS 端末内の PHAsset を指すので Android では開けない。**枠を出さずに
+ * タイムラインとスタッツだけを描く**（動画なしの試合と同じ扱い）。
+ */
+private fun playableVideoSource(source: VideoSource?): VideoSource? =
+    source?.takeIf { it.provider == VideoProvider.YOUTUBE }
+
 @Composable
 private fun MatchDetailContentList(content: MatchDetailContent, onSeek: (Double) -> Unit) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        // 1. 動画枠。**動画を持たない試合では丸ごと出さない。**
-        if (content.videoSource != null) {
-            item { VideoPlaceholder() }
-        }
         item { ScoreHeader(content) }
 
         // 2. タイムライン。
@@ -182,33 +208,6 @@ private fun MatchDetailContentList(content: MatchDetailContent, onSeek: (Double)
                 content = content,
             )
         }
-    }
-}
-
-/**
- * 動画枠のプレースホルダ。
- *
- * 次のチャンクでここに YouTube の WebView が入る。**16:9 の枠を今から確保しておく**のは、
- * プレイヤーが載ったときにタイムラインの位置が飛ばないようにするため。
- */
-@Composable
-private fun VideoPlaceholder() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .aspectRatio(16f / 9f),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "ここに動画が入ります（次の実装で有効になります）",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(16.dp),
-        )
     }
 }
 
@@ -299,7 +298,7 @@ private fun TimelineRow(resolved: ResolvedFact, content: MatchDetailContent, onS
     // シーク先。**記録時刻そのものではなく少し手前へ飛ばす**（PlaybackOffsets の 3 秒）。
     // 動画時刻が解決できない fact と、動画を持たない試合では null = 押せない行になる。
     val seekTarget = resolved.resolvedVideoClock
-        ?.takeIf { content.videoSource != null }
+        ?.takeIf { playableVideoSource(content.videoSource) != null }
         ?.let { PlaybackOffsets.seekTarget(it.elapsedSeconds) }
     val rowModifier = Modifier
         .fillMaxWidth()

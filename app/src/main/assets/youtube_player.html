@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<!--
+  YouTube IFrame Player API のホスト HTML。
+
+  iOS 版 HandballRecorder の
+  `Packages/RecorderInfrastructureApple/Sources/RecorderInfrastructureApple/Resources/youtube_player.html`
+  からの移植。**構造・関数名・イベントの種類は変えていない。**変えたのはネイティブへの
+  送信口 1 点だけ — iOS の `window.webkit.messageHandlers.ytEvent.postMessage(...)` を
+  Android の `@JavascriptInterface`（`window.AndroidYouTube.postMessage(...)`）に差し替えてある。
+
+  規約（RMF / Developer Policies）:
+  - 触ってよいのは `YT.Player` の**公式メソッドとイベントだけ**。`document.querySelector('video')`
+    のような内部 DOM アクセスや低レベル `postMessage` は使わない。
+  - `minimalControls` はプレーヤーのコントロールを消すので**単独では有効にしない**
+    （iOS から形だけ持ち込んである。ネイティブ側は常に false を渡す）。
+  詳細は README「YouTube 連携（RMF）」。
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<style>
+* { margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+    background: #000;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+/* プレーヤー枠を動画と同じ 16:9 に収めて、余白の中央寄せは自前で持つ（親リポ #233）。
+   枠を画面いっぱい（横長）にすると 16:9 の映像をどこへ置くかが IFrame 内部の実装依存になり、
+   全画面再生（landscape 896x414 = 2.16:1）で左右の黒帯が非対称になる。
+   display: block は iframe 既定の inline による行ボックス descender ぶん（実測 5pt）の
+   下端切れを止めるためにも要る。 */
+#player {
+    display: block;
+    border: 0;
+    width: 100%;
+    height: 100%;
+    max-width: calc(100vh * 16 / 9);
+    max-height: calc(100vw * 9 / 16);
+}
+</style>
+</head>
+<body>
+<div id="player"></div>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+var player;
+var _pendingConfig = null;
+
+function initPlayer(videoId, origin, options) {
+    var opts = options || {};
+    if (typeof YT !== 'undefined' && YT.Player) {
+        _createPlayer(videoId, origin, opts);
+    } else {
+        _pendingConfig = { videoId: videoId, origin: origin, options: opts };
+    }
+}
+
+function onYouTubeIframeAPIReady() {
+    if (_pendingConfig) {
+        _createPlayer(_pendingConfig.videoId, _pendingConfig.origin, _pendingConfig.options || {});
+        _pendingConfig = null;
+    }
+}
+
+function _createPlayer(videoId, origin, options) {
+    var playerVars = {
+        playsinline: 1,
+        rel: 0,
+        origin: origin
+    };
+    // 連続再生画面など、YouTube 標準 UI を全部消したいとき用。
+    if (options && options.minimalControls === true) {
+        playerVars.controls = 0;
+        playerVars.disablekb = 1;
+        playerVars.fs = 0;
+        playerVars.iv_load_policy = 3;
+        playerVars.modestbranding = 1;
+    }
+    player = new YT.Player('player', {
+        videoId: videoId,
+        playerVars: playerVars,
+        events: {
+            onReady: function() {
+                window.AndroidYouTube.postMessage(
+                    JSON.stringify({ type: 'ready' })
+                );
+            },
+            onError: function(event) {
+                window.AndroidYouTube.postMessage(
+                    JSON.stringify({ type: 'error', code: event.data })
+                );
+            },
+            onStateChange: function(event) {
+                window.AndroidYouTube.postMessage(
+                    JSON.stringify({ type: 'stateChange', state: event.data })
+                );
+            },
+            onPlaybackRateChange: function(event) {
+                window.AndroidYouTube.postMessage(
+                    JSON.stringify({ type: 'playbackRateChange', rate: event.data })
+                );
+            }
+        }
+    });
+}
+</script>
+</body>
+</html>
