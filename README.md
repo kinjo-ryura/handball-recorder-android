@@ -101,6 +101,30 @@ devShell に入るたびに wrapper のピン留めと一致するかを検査�
 | compileSdk / targetSdk | 36 | `buildToolsVersion = "37.0.0"` を明示 |
 | minSdk | 24 | `java.time` を使うため `coreLibraryDesugaring` が要る |
 
+## 変更の出し方
+
+**`main` へ直接 push できない。** public repo なので ruleset `protect-main` を掛けてある
+（**PR 必須 + CI green 必須。オーナーも bypass できない**）。
+
+```sh
+git switch -c <branch>
+# ...
+gh pr create --fill
+gh pr merge --squash --delete-branch   # CI が緑になってから
+```
+
+CI（[`.github/workflows/ci.yml`](.github/workflows/ci.yml) の `check`）が回すのは
+**assembleDebug / 単体テスト / lint**、そして **`gradle-wrapper.jar` の検証**（コミット済みの
+wrapper が正規の配布物かを照合する。fork される前提の public repo なので、差し替えられた
+wrapper を黙って実行しないことに意味がある）。コアの `.aar` は handball-toolkit の Release から
+取るので、CI でも手元と同じく **Rust / NDK は要らない**。
+
+`.aar` の版は `app/build.gradle.kts` の 1 か所だけが持ち、CI はそこから読む。上げるときは
+そのファイルと上のバージョン表を直せばよい（workflow は触らない）。
+
+**ジョブ名 `check` は ruleset の required status check と一致している。** 変えるなら
+ruleset 側も同時に変えること（片方だけ変えると PR が永久にマージできなくなる）。
+
 ## インストール（利用者向け）
 
 APK は [Releases](https://github.com/kinjo-ryura/handball-recorder-android/releases) で配布する。

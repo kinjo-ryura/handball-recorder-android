@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 同一ブランチで走行中のジョブは新しい push で打ち切る。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ジョブ名は ruleset `protect-main` の required status check（`check`）と一致させている。
+  # 変えるなら ruleset 側も同時に変えること（変えると PR が永久にマージできなくなる）。
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # ランナー同梱の SDK には buildToolsVersion = "37.0.0" が無い（app/build.gradle.kts が
+      # 明示している）。compileSdk = 36 と組で入れる。
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-36 build-tools;37.0.0'
+
+      # Gradle 本体は wrapper が供給する（flake ではない — README「nix を使う場合」）。
+      # このアクションは依存のキャッシュに加え、**コミット済みの gradle-wrapper.jar が
+      # 正規の配布物かを検証する**（validate-wrappers は既定で有効）。public repo で
+      # fork される前提なので、差し替えられた wrapper を黙って実行しないことに意味がある。
+      - uses: gradle/actions/setup-gradle@v4
+
+      # コアは prebuilt .aar として handball-toolkit の Release から取る。
+      # **Rust / NDK は要らない**（ADR 0006）。外部利用者とまったく同じ経路を通る。
+      #
+      # 版は app/build.gradle.kts から読む。ここに版を書くと README・ビルド定義との
+      # 三重管理になり、上げたときに CI だけ古い .aar で緑になる。
+      - name: コアの .aar を取得
+        run: |
+          set -euo pipefail
+          aar=$(sed -n 's/.*libs\/\(handball-toolkit-[0-9][0-9A-Za-z.+-]*\.aar\).*/\1/p' app/build.gradle.kts)
+          if [ -z "$aar" ]; then
+            echo "app/build.gradle.kts から .aar の版を読めませんでした。" >&2
+            echo "implementation(files(\"libs/handball-toolkit-<版>.aar\")) の行を確認してください。" >&2
+            exit 1
+          fi
+          ver=${aar#handball-toolkit-}
+          ver=${ver%.aar}
+          echo "toolkit $ver ($aar)"
+          mkdir -p app/libs
+          curl -fsSL --retry 3 -o "app/libs/$aar" \
+            "https://github.com/kinjo-ryura/handball-toolkit/releases/download/v${ver}/${aar}"
+
+      - name: assembleDebug
+        run: ./gradlew :app:assembleDebug --console=plain
+
+      # 現時点でテストは 0 件（NO-SOURCE で素通りする）。足したときに黙って
+      # 走らないままにならないよう、先に経路を通しておく。
+      - name: 単体テスト
+        run: ./gradlew :app:testDebugUnitTest --console=plain
+
+      - name: lint
+        run: ./gradlew :app:lintDebug --console=plain
+
+      # 落ちたときに HTML レポートを見られるようにする（lint の指摘は行番号だけだと辿りにくい）。
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: lint-report
+          path: app/build/reports/
+          retention-days: 7
