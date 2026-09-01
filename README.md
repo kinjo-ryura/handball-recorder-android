@@ -275,8 +275,8 @@ lint は `GradleDependency` で「もっと新しい版がある」と言い続�
 
 ## アイコン
 
-ランチャーアイコンは **iOS 版と同じ意匠**（五角形を作る 5 本のバー）。琥珀 `#F59E0B` は
-[シュートフォーム分析](https://hand-plus.com/) と共通で **3 アプリを貫く family の印**、
+ランチャーアイコンは **iOS 版と同じ意匠**（五角形を作る 5 本のバー + 縁で切れる白い破片 2 つ）。
+琥珀は [シュートフォーム分析](https://hand-plus.com/) と共通で **3 アプリを貫く family の印**、
 背景の紫 `#A827BA`（iOS 版の `automatic-gradient` の基準色）が**ハンド記録固有**の色。
 
 **MIT なので fork 先もこのアイコンをそのまま使ってよい。** コードと同じ扱いで、
@@ -286,13 +286,19 @@ lint は `GradleDependency` で「もっと新しい版がある」と言い続�
 |---|---|
 | `res/mipmap-anydpi-v26/ic_launcher{,_round}.xml` | API 26 以降の adaptive icon。中身は同じで、丸くするかは端末側のマスクが決める |
 | `res/drawable/ic_launcher_background.xml` | 背景の紫（縦グラデーション） |
-| `res/drawable/ic_launcher_foreground.xml` | 5 本のバー。**意匠の唯一の出どころ** |
+| `res/drawable/ic_launcher_foreground.xml` | 5 本のバー + 破片 2 つ。**意匠の唯一の出どころ** |
 | `res/drawable/ic_launcher_monochrome.xml` | Android 13 以降のテーマアイコン。前景と同じ形を単色にしたもの |
 | `res/mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher{,_round}.png` | **API 24/25 用のフォールバック**。minSdk = 24 なのでこれが無いとその世代でアイコンが出ない |
 
-前景のベクターは元データと同じ 1024×1024 の座標系で、`<group>` の `scale 0.8` +
-`translate(102.4, 130.8)` で **adaptive icon の安全域**（108dp のうち内側 72dp）へ収めてある。
-数値の根拠と、元データにあって意図的に落とした要素（キャンバス外へはみ出した白い破片 2 つ）は
+前景のベクターは元データと同じ 1024×1024 の座標系で、**これを 108dp 全面に対応させ**、
+`<group>` の `scale 0.86` + `translate(71.68, 71.68)` でキャンバス中心を軸に少しだけ縮めてある。
+5 本のバーはどれも中心 (512,512) から半径 363.2 の円に載っているので、この倍率で
+**外接円が Android のキーライン円（66dp）とほぼ一致する** — 円 / squircle / ほぼ四角の
+どのマスクでも角が切れず、見える 72dp の 88% を占める。
+
+iOS の質感（`soft-light` + 半透明 + 影）は vector drawable では表現できないので、
+**iOS の実物から合成後の色を測って**縦グラデーション・半透明・縁の光・外側の影で近似している。
+数値の根拠と、元データにあって意図的に落とした要素は
 `ic_launcher_foreground.xml` の冒頭コメントに書いてある。
 
 ### 作り直し方
@@ -303,10 +309,10 @@ lint は `GradleDependency` で「もっと新しい版がある」と言い続�
 scripts/generate-launcher-icons.sh
 ```
 
-スクリプトはベクター XML から色とパスを**読み出して** 1024px のマスタを描き、各 dpi へ縮小する
-（形も色もスクリプトは持たない）。`<group>` の変換や背景グラデーションの向きを変えたのに
-スクリプト側の定数を直し忘れた場合は、突き合わせに失敗して止まる。前景と
-`ic_launcher_monochrome.xml` は手で同期させること。
+スクリプトはベクター XML から色（単色 / グラデーション）とパスを**読み出して** 1024px の
+マスタを描き、各 dpi へ縮小する（形も色もスクリプトは持たない）。`<group>` の変換・背景
+グラデーションの向き・前景のパス本数を変えたのにスクリプト側の定数を直し忘れた場合は、
+突き合わせに失敗して止まる。前景と `ic_launcher_monochrome.xml` は手で同期させること。
 
 前提は **macOS（`sips`）+ Google Chrome**（`CHROME=` で場所を指定できる）。CI では回さない
 （生成物はコミット済み）。

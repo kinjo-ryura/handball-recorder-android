@@ -1,8 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- ランチャーアイコンの背景（adaptive icon の <background>）。
-     iOS 版（HandballRecorder.icon）の automatic-gradient と同じ紫。
-     基準色 srgb:0.65727,0.15473,0.72953 = #A827BA を中央に置き、上を明るく・下を暗くした
-     縦グラデーションで Icon Composer の自動グラデーションに寄せている（明度 ±約 11%）。
+     iOS 版（HandballRecorder.icon）の automatic-gradient（基準色
+     srgb:0.65727,0.15473,0.72953 = #A827BA）を、**実際に描かれた結果**から写したもの。
+     apps-site の icon-512.png を測ると、上端 10% が #BF62D6 の平坦域、そこから
+     y 66% までほぼ直線で #9A33B4 まで下がり、以降は平坦。左右方向の変化は無い。
+
+     ■ なぜ 108dp 全面ではなく「見える 72dp」にグラデーションを合わせないのか
+     合わせている。adaptive icon で実際に見えるのは 108dp のうち内側 72dp（y 18..90dp）
+     なので、iOS の 1024 キャンバス全体がその 72dp に載るよう offset を写している:
+       iOS y=104(10.2%) → 18 + 72*0.102 = 25.3dp → offset 0.234
+       iOS y=680(66.4%) → 18 + 72*0.664 = 65.8dp → offset 0.609
+     外側 18dp はマスクで切られるが、端末のパララックス表示でわずかに覗くので
+     端の色で clamp させている（両端に同じ色の stop を置いてある）。
+
      色を変えるときは scripts/generate-launcher-icons.sh を回して PNG も作り直すこと。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
@@ -18,9 +28,10 @@
                 android:startY="0"
                 android:endX="54"
                 android:endY="108">
-                <item android:offset="0" android:color="#FFC645D8" />
-                <item android:offset="0.5" android:color="#FFA827BA" />
-                <item android:offset="1" android:color="#FF7E1D8B" />
+                <item android:offset="0" android:color="#FFBF62D6" />
+                <item android:offset="0.234" android:color="#FFBF62D6" />
+                <item android:offset="0.609" android:color="#FF9A33B4" />
+                <item android:offset="1" android:color="#FF9A33B4" />
             </gradient>
         </aapt:attr>
     </path>

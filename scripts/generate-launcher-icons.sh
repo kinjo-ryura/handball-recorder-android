@@ -26,20 +26,23 @@ CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 
 # adaptive icon の <foreground> に掛けている group 変換。ベクター側と食い違うと PNG だけ
 # 別の絵になるので、読み出した値と突き合わせて食い違ったら止める。
-SCALE=0.8
-TX=102.4
-TY=130.8
+SCALE=0.86
+TX=71.68
+TY=71.68
+# 前景のパス本数（影 2 段 × 7 + 面 7 + 縁の光 7）。増減に気付かず PNG だけ古いままに
+# なるのを防ぐ。
+FG_PATHS=28
 # 旧形式アイコンは「マスクが見せる内側 72dp」を 1024px いっぱいに引き伸ばしたもの。
-#   1024 換算の安全域 = 1024 * 18/108 .. 1024 * 90/108 = 170.667 .. 853.333
-#   拡大率 = 108/72 = 1.5
-# 合成すると  x' = 1.5*(SCALE*x + TX) - 256,  y' = 1.5*(SCALE*y + TY) - 256
-LEG_SCALE=1.2             # = 1.5 * 0.8
-LEG_TX=-102.4            # = 1.5 * 102.4 - 256
-LEG_TY=-59.8             # = 1.5 * 130.8 - 256
-# 背景グラデーションは 108dp キャンバス全体に掛かっているので、切り出した後の 1024px 上では
-# 開始 / 終了が外側にずれる（1.5*(0-170.667) = -256 / 1.5*(1024-170.667) = 1280）。
-GRAD_Y1=-256
-GRAD_Y2=1280
+#   crop = 108dp のうち内側 72dp → 拡大率 108/72 = 1.5、原点は 1024*18/108 = 170.667
+#   合成すると  transform="translate(-256,-256) scale(1.5)"（前景の 1024 座標系に対して）
+LEG_SCALE=1.5
+LEG_OFF=-256
+# 背景は viewport が 108 なので、1024 へ載せる 1024/108 = 9.481481 も掛ける
+# （9.481481 * 1.5 = 14.222222）。
+LEG_BG_SCALE=14.222222
+# グラデーションは gradientUnits="userSpaceOnUse" でパスと同じ座標系に置くので、
+# 上の transform がそのまま効く（座標の付け替えは要らない）。
+#
 # 旧形式アイコンの角丸半径（1024px 基準）。adaptive icon と違って端末側のマスクが無いので、
 # ここで付けないと ic_launcher.png が真四角になる。
 CORNER=225
@@ -58,6 +61,7 @@ check 'android:viewportWidth="1024"' "$FG" "前景の viewport が 1024 では�
 check "android:scaleX=\"$SCALE\""     "$FG" "前景の group 変換がスクリプトの定数と違います。"
 check "android:translateX=\"$TX\""    "$FG" "前景の group 変換がスクリプトの定数と違います。"
 check "android:translateY=\"$TY\""    "$FG" "前景の group 変換がスクリプトの定数と違います。"
+check 'android:viewportWidth="108"'   "$BG" "背景の viewport が 108 ではありません。"
 check 'android:startX="54"'           "$BG" "背景グラデーションが縦方向の全面グラデーションではありません。"
 check 'android:startY="0"'            "$BG" "背景グラデーションが縦方向の全面グラデーションではありません。"
 check 'android:endY="108"'            "$BG" "背景グラデーションが縦方向の全面グラデーションではありません。"
@@ -65,28 +69,92 @@ check 'android:endY="108"'            "$BG" "背景グラデーションが縦�
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-# ── ベクター XML から色とパスを取り出す ────────────────────────────────────────
-awk '
-    /<item / {
-        off = $0; sub(/.*android:offset="/, "", off); sub(/".*/, "", off)
-        col = $0; sub(/.*android:color="/,  "", col); sub(/".*/, "", col)
-        a = toupper(substr(col, 2, 2))
-        if (a != "FF") { print "背景グラデーションの半透明には未対応です: " col > "/dev/stderr"; exit 1 }
-        printf "      <stop offset=\"%s\" stop-color=\"#%s\"/>\n", off, substr(col, 4, 6)
-    }
-' "$BG" > "$TMP_DIR/stops.svg"
-[ -s "$TMP_DIR/stops.svg" ] || { echo "背景グラデーションの stop を読めませんでした。" >&2; exit 1; }
+# ── ベクター XML を SVG の断片へ変換する ───────────────────────────────────────
+# <path> を上から順に読み、面（単色 / linear gradient）と線（stroke）をそのまま写す。
+# 出力は defs（gradient 定義）と body（path 本体）の 2 ファイル。
+vector_to_svg() {  # $1 = 入力 XML, $2 = id 接頭辞, $3 = defs 出力, $4 = body 出力
+    awk -v IDP="$2" -v DEFS="$3" -v BODY="$4" '
+        function hexv(s,   i, c, v, d) {
+            v = 0
+            for (i = 1; i <= length(s); i++) {
+                c = toupper(substr(s, i, 1))
+                d = index("0123456789ABCDEF", c) - 1
+                if (d < 0) { print "16 進として読めません: " s > "/dev/stderr"; exit 1 }
+                v = v * 16 + d
+            }
+            return v
+        }
+        # #AARRGGBB / #RRGGBB を CSS の色 + 不透明度へ。結果は COL / OPA に入れる。
+        function css(c) {
+            sub(/^#/, "", c)
+            if (length(c) == 8)      { OPA = hexv(substr(c, 1, 2)) / 255; COL = "#" substr(c, 3, 6) }
+            else if (length(c) == 6) { OPA = 1;                           COL = "#" c }
+            else { print "色の形式が想定外です: " c > "/dev/stderr"; exit 1 }
+        }
+        function attr(s, name,   t) {
+            t = s
+            if (index(t, name "=\"") == 0) return ""
+            sub(".*" name "=\"", "", t)
+            sub("\".*", "", t)
+            return t
+        }
+        function emit(   fillattr, fillop, out, gid) {
+            np++
+            fillattr = "none"; fillop = 1
+            if (hasgrad) {
+                ngrad++
+                gid = IDP "g" ngrad
+                printf("    <linearGradient id=\"%s\" gradientUnits=\"userSpaceOnUse\" x1=\"%s\" y1=\"%s\" x2=\"%s\" y2=\"%s\">\n%s    </linearGradient>\n",
+                       gid, gx1, gy1, gx2, gy2, stops) > DEFS
+                fillattr = "url(#" gid ")"
+            } else if (fc != "") {
+                css(fc); fillattr = COL; fillop = OPA
+                if (fa != "") fillop = fillop * fa
+            }
+            out = sprintf("    <path d=\"%s\" fill=\"%s\" fill-opacity=\"%.4f\"", d, fillattr, fillop)
+            if (sc != "") {
+                css(sc)
+                out = out sprintf(" stroke=\"%s\" stroke-opacity=\"%.4f\" stroke-width=\"%s\"", COL, OPA, sw)
+            }
+            print out "/>" > BODY
+            inpath = 0
+        }
+        /<path/ && !/<\/path>/ { inpath = 1; d = ""; fc = ""; fa = ""; sc = ""; sw = ""; hasgrad = 0; stops = "" }
+        inpath && /android:pathData="/    { d  = attr($0, "android:pathData") }
+        inpath && /android:fillColor="#/  { fc = attr($0, "android:fillColor") }
+        inpath && /android:fillAlpha="/   { fa = attr($0, "android:fillAlpha") }
+        inpath && /android:strokeColor="/ { sc = attr($0, "android:strokeColor") }
+        inpath && /android:strokeWidth="/ { sw = attr($0, "android:strokeWidth") }
+        inpath && /<gradient/ { hasgrad = 1 }
+        inpath && /android:type="/ {
+            if (attr($0, "android:type") != "linear") {
+                print "linear 以外のグラデーションには未対応です: " attr($0, "android:type") > "/dev/stderr"; exit 1
+            }
+        }
+        inpath && /android:startX="/ { gx1 = attr($0, "android:startX") }
+        inpath && /android:startY="/ { gy1 = attr($0, "android:startY") }
+        inpath && /android:endX="/   { gx2 = attr($0, "android:endX") }
+        inpath && /android:endY="/   { gy2 = attr($0, "android:endY") }
+        inpath && /<item / {
+            css(attr($0, "android:color"))
+            stops = stops sprintf("      <stop offset=\"%s\" stop-color=\"%s\" stop-opacity=\"%.4f\"/>\n",
+                                  attr($0, "android:offset"), COL, OPA)
+        }
+        inpath && /<\/path>/ { emit() }
+        inpath && /\/>[ \t]*$/ && !/<item / && !/<gradient/ { emit() }
+        END { print np }
+    ' "$1"
+}
 
-awk '
-    /android:fillColor="/ { c = $0; sub(/.*android:fillColor="/, "", c); sub(/".*/, "", c); a = "1" }
-    /android:fillAlpha="/ { a = $0; sub(/.*android:fillAlpha="/, "", a); sub(/".*/, "", a) }
-    /android:pathData="/  {
-        d = $0; sub(/.*android:pathData="/, "", d); sub(/".*/, "", d)
-        printf "    <path d=\"%s\" fill=\"%s\" fill-opacity=\"%s\"/>\n", d, c, a
-        n++
-    }
-    END { if (n != 5) { print "前景のパスが 5 本ではありません: " n > "/dev/stderr"; exit 1 } }
-' "$FG" > "$TMP_DIR/paths.svg"
+FG_N="$(vector_to_svg "$FG" fg "$TMP_DIR/fg_defs.svg" "$TMP_DIR/fg_body.svg")"
+BG_N="$(vector_to_svg "$BG" bg "$TMP_DIR/bg_defs.svg" "$TMP_DIR/bg_body.svg")"
+[ "$FG_N" = "$FG_PATHS" ] || {
+    echo "前景のパスが $FG_PATHS 本ではありません: $FG_N" >&2
+    echo "  意図して増減させたなら scripts/generate-launcher-icons.sh の FG_PATHS も直すこと。" >&2
+    exit 1
+}
+[ "$BG_N" = 1 ] || { echo "背景のパスが 1 本ではありません: $BG_N" >&2; exit 1; }
+[ -s "$TMP_DIR/bg_defs.svg" ] || { echo "背景グラデーションを読めませんでした。" >&2; exit 1; }
 
 # ── 1024px のマスタ SVG を組む（shape = round / rounded） ──────────────────────
 master_svg() {  # $1 = round|rounded
@@ -99,14 +167,17 @@ master_svg() {  # $1 = round|rounded
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <clipPath id="m">$clip</clipPath>
-    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="512" y1="$GRAD_Y1" x2="512" y2="$GRAD_Y2">
-$(cat "$TMP_DIR/stops.svg")
-    </linearGradient>
+$(cat "$TMP_DIR/bg_defs.svg")
+$(cat "$TMP_DIR/fg_defs.svg")
   </defs>
   <g clip-path="url(#m)">
-    <rect x="0" y="0" width="1024" height="1024" fill="url(#bg)"/>
-    <g transform="translate($LEG_TX,$LEG_TY) scale($LEG_SCALE)">
-$(cat "$TMP_DIR/paths.svg")
+    <g transform="translate($LEG_OFF,$LEG_OFF) scale($LEG_BG_SCALE)">
+$(cat "$TMP_DIR/bg_body.svg")
+    </g>
+    <g transform="translate($LEG_OFF,$LEG_OFF) scale($LEG_SCALE)">
+      <g transform="translate($TX,$TY) scale($SCALE)">
+$(cat "$TMP_DIR/fg_body.svg")
+      </g>
     </g>
   </g>
 </svg>
