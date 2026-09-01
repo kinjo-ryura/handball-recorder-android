@@ -5,5 +5,8 @@
 plugins {
     id("com.android.application") version "8.11.1" apply false
     id("org.jetbrains.kotlin.android") version "2.1.21" apply false
+    // Compose コンパイラプラグイン。Kotlin 2.0 以降はコンパイラ本体と同梱なので、
+    // **バージョンは Kotlin と完全一致でなければならない**（片方だけ上げると解決に失敗する）。
+    id("org.jetbrains.kotlin.plugin.compose") version "2.1.21" apply false
     id("com.google.devtools.ksp") version "2.1.21-2.0.1" apply false
 }

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  画面は全面的に Compose が描くので、この XML テーマが受け持つのは
+  「タイトルバーを出さないこと」と「Compose が最初のフレームを描くまでの窓の地色」だけ。
+  ダーク時は values-night/themes.xml が親を差し替える（配色の本体は Compose 側の
+  MaterialTheme が持つ — ui/theme/Theme.kt）。
+-->
+<resources>
+    <style name="Theme.HandballRecorder" parent="@android:style/Theme.Material.Light.NoActionBar" />
+</resources>

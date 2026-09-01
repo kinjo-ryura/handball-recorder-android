@@ -1,6 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    // 画面は Jetpack Compose。版はルートの build.gradle.kts が持つ（Kotlin と同一）。
+    id("org.jetbrains.kotlin.plugin.compose")
     // Room の DAO 実装生成（kapt ではなく KSP）。
     id("com.google.devtools.ksp")
 }
@@ -30,11 +32,14 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            // 実測用に release も端末へ入れたいので debug 鍵で署名する（配布物ではない）。
-            // **debug ビルドで性能を測らないこと**: debuggable なプロセスでは ART が
-            // -Xcheck:jni を有効化し、JNI 往復ごとに検査が入って桁が変わる（README 参照）。
-            signingConfig = signingConfigs.getByName("debug")
+            // 署名設定は置かない。ここは APK を直配布するリポジトリなので、debug 鍵で
+            // 署名された release が「配布できる成果物」に見えてしまうほうが有害
+            // （配布用の署名鍵は Releases を出すときに別途用意する）。
         }
+    }
+
+    buildFeatures {
+        compose = true
     }
 
     compileOptions {
@@ -76,6 +81,21 @@ dependencies {
     // 生成コードが Native.register で .so を dlopen するのに JNA、suspend 関数に coroutines。
     implementation("net.java.dev.jna:jna:5.17.0@aar")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+
+    // ── 画面（Jetpack Compose / Material 3）──
+    // BOM が版をまとめて決めるのは **androidx.compose.* だけ**。activity / lifecycle /
+    // navigation は BOM の管轄外なので個別に版を書く（README のバージョン表と対応）。
+    implementation(platform("androidx.compose:compose-bom:2025.06.01"))
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    // @Preview のレンダラは debug ビルドにだけ入れる（release へ持ち込むと無駄に太る）。
+    debugImplementation("androidx.compose.ui:ui-tooling")
+
+    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.1")
+    implementation("androidx.navigation:navigation-compose:2.9.0")
 
     // ── 永続化（シェルの責務。コアは DB を所有しない）──
     implementation("androidx.room:room-runtime:2.7.2")

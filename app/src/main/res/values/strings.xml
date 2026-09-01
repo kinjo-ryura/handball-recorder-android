@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ユーザー向け文言はすべてシェル側が持つ（コアはコードとパラメータしか返さない）。
+  ただしコア由来のエラー文言だけは .aar の values-ja が既定を供給するので、ここには書かない。
+-->
+<resources>
+    <!-- iOS 版（App Store）・web デモと同じ製品名。 -->
+    <string name="app_name">ハンド記録</string>
+</resources>

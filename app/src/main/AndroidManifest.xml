@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 配信中のサンプル試合 / ハイライト JSON を取得する。これが無いと通信そのものが
+         できず、アプリは空の一覧しか出せない。 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
-        android:label="Handball Toolkit Shell"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:label="@string/app_name"
+        android:theme="@style/Theme.HandballRecorder">
         <activity
             android:name=".MainActivity"
             android:exported="true">

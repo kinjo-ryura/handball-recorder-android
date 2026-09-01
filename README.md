@@ -14,9 +14,8 @@ iOS 版（[App Store](https://apps.apple.com/jp/app/id6762165079)・private repo
 | 含む | 含まない |
 |---|---|
 | 配信中のサンプル試合 / ハイライトの取得 | **記録機能すべて** |
-| 端末への取り込みと保存（Room） | ローカル動画 |
-| タイムライン / スタッツ表示 | 2 台同期録画 |
-| YouTube 再生とシーク | Play ストア公開 |
+| タイムライン / スタッツ表示 | 端末への保存（開くたびに取得する） |
+| YouTube 再生とシーク | ローカル動画 / 2 台同期録画 / Play ストア公開 |
 
 試合データは [handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) が
 配信する v2 スキーマの JSON を取得する。同じ内容は web でも見られる
@@ -42,10 +41,18 @@ DB ハンドルとトランザクション境界、素朴な CRUD、ID / 時刻�
 
 ## 現状
 
-**シード投入直後**で、画面はまだ handball-toolkit の
-[`examples/android`](https://github.com/kinjo-ryura/handball-toolkit/tree/main/examples/android)
-（シェル契約の参照実装）のままです。Room の DB 層と 15 メソッドの write repository は動きますが、
-上のスコープにある一覧・詳細画面と YouTube 再生はこれから実装します。
+**Jetpack Compose の器まで置いた段階**です。シード（handball-toolkit の
+[`examples/android`](https://github.com/kinjo-ryura/handball-toolkit/tree/main/examples/android)）が
+持っていたデモ UI — ボタン 7 個でシェル契約の write 経路を踏む画面 — は、見る専用 MVP とは
+用途が逆なので捨てました。いま入っているのは Material 3 のテーマと、`list` /
+`detail/{kind}/{slug}` の 2 つの行き先を持つ `NavHost` だけで、**画面の中身は
+プレースホルダ**です。配信データの取得・一覧・タイムライン / スタッツ・YouTube 再生は
+これから実装します。
+
+**Room の DB 層（`db/`）と 15 メソッドの write repository（`RoomWriteRepositories.kt`）は
+残してあります。** 見る専用 MVP は端末に保存しないのでどちらも通りませんが、記録機能を
+足すときには必ず要るもので、しかも**公開できるシェル契約の参照実装はこれだけ**だからです
+（handball-toolkit 側の `examples/android` と対になる）。
 
 ## ビルド
 
@@ -92,14 +99,28 @@ devShell に入るたびに wrapper のピン留めと一致するかを検査�
 |---|---|---|
 | Gradle | 8.14.4 | wrapper がピン留め（配布物の SHA-256 も固定） |
 | AGP | 8.11.1 | Gradle 8.13+ を要求 |
-| Kotlin | 2.1.21 | KSP と組で上げること |
+| Kotlin | 2.1.21 | KSP・Compose コンパイラと組で上げること |
 | KSP | 2.1.21-2.0.1 | Kotlin と完全一致が必要 |
+| Compose コンパイラプラグイン | 2.1.21 | `org.jetbrains.kotlin.plugin.compose`。**Kotlin と完全一致が必要**（Kotlin 2.0 以降はコンパイラ同梱） |
+| Compose BOM | 2025.06.01 | compose-ui 1.8.3 / material3 1.3.2 を決める |
+| activity-compose | 1.10.1 | **BOM の管轄外**（BOM が版を決めるのは `androidx.compose.*` だけ） |
+| lifecycle-viewmodel-compose / lifecycle-runtime-compose | 2.9.1 | 同上 |
+| navigation-compose | 2.9.0 | 同上 |
 | Room | 2.7.2 | |
 | handball-toolkit | 0.5.0 | `app/libs/handball-toolkit-0.5.0.aar` |
 | JNA | 5.17.0（`@aar`） | **`.aar` は依存情報を運ばない**ので利用側で宣言する |
 | kotlinx-coroutines | 1.10.2 | 同上 |
 | compileSdk / targetSdk | 36 | `buildToolsVersion = "37.0.0"` を明示 |
 | minSdk | 24 | `java.time` を使うため `coreLibraryDesugaring` が要る |
+
+**Compose 系はあえて最新を追っていない。** ここに書いた組は Kotlin 2.1.21 / AGP 8.11.1 と
+同世代のもの。最新（compose-bom 2026.08.00 / lifecycle 2.11.0 / navigation-compose 2.10.0）は
+`checkDebugAarMetadata` が **AGP 9.1.0 以上と compileSdk 37 以上を要求して落ちる**
+（2026-09-01 に実測）。**上げるなら AGP・compileSdk・CI の `setup-android` が入れる
+platform / build-tools まで一式で動かすこと。**
+
+lint は `GradleDependency` で「もっと新しい版がある」と言い続けるが、これは警告であって
+ビルドは通る（AGP・JNA・coroutines についても以前から同じ警告が出ている）。
 
 ## 変更の出し方
 
