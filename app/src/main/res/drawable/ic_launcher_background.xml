@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ランチャーアイコンの背景（adaptive icon の <background>）。
+     iOS 版（HandballRecorder.icon）の automatic-gradient と同じ紫。
+     基準色 srgb:0.65727,0.15473,0.72953 = #A827BA を中央に置き、上を明るく・下を暗くした
+     縦グラデーションで Icon Composer の自動グラデーションに寄せている（明度 ±約 11%）。
+     色を変えるときは scripts/generate-launcher-icons.sh を回して PNG も作り直すこと。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54"
+                android:startY="0"
+                android:endX="54"
+                android:endY="108">
+                <item android:offset="0" android:color="#FFC645D8" />
+                <item android:offset="0.5" android:color="#FFA827BA" />
+                <item android:offset="1" android:color="#FF7E1D8B" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

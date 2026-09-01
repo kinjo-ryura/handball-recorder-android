@@ -273,6 +273,44 @@ platform / build-tools まで一式で動かすこと。**
 lint は `GradleDependency` で「もっと新しい版がある」と言い続けるが、これは警告であって
 ビルドは通る（AGP・JNA・coroutines についても以前から同じ警告が出ている）。
 
+## アイコン
+
+ランチャーアイコンは **iOS 版と同じ意匠**（五角形を作る 5 本のバー）。琥珀 `#F59E0B` は
+[シュートフォーム分析](https://hand-plus.com/) と共通で **3 アプリを貫く family の印**、
+背景の紫 `#A827BA`（iOS 版の `automatic-gradient` の基準色）が**ハンド記録固有**の色。
+
+**MIT なので fork 先もこのアイコンをそのまま使ってよい。** コードと同じ扱いで、
+別名で公開するときに差し替える義務はない（差し替えるのも自由）。
+
+| ファイル | 役割 |
+|---|---|
+| `res/mipmap-anydpi-v26/ic_launcher{,_round}.xml` | API 26 以降の adaptive icon。中身は同じで、丸くするかは端末側のマスクが決める |
+| `res/drawable/ic_launcher_background.xml` | 背景の紫（縦グラデーション） |
+| `res/drawable/ic_launcher_foreground.xml` | 5 本のバー。**意匠の唯一の出どころ** |
+| `res/drawable/ic_launcher_monochrome.xml` | Android 13 以降のテーマアイコン。前景と同じ形を単色にしたもの |
+| `res/mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher{,_round}.png` | **API 24/25 用のフォールバック**。minSdk = 24 なのでこれが無いとその世代でアイコンが出ない |
+
+前景のベクターは元データと同じ 1024×1024 の座標系で、`<group>` の `scale 0.8` +
+`translate(102.4, 130.8)` で **adaptive icon の安全域**（108dp のうち内側 72dp）へ収めてある。
+数値の根拠と、元データにあって意図的に落とした要素（キャンバス外へはみ出した白い破片 2 つ）は
+`ic_launcher_foreground.xml` の冒頭コメントに書いてある。
+
+### 作り直し方
+
+**PNG は手で編集しない。** 色や形を変えるときは上のベクター XML を直してから:
+
+```sh
+scripts/generate-launcher-icons.sh
+```
+
+スクリプトはベクター XML から色とパスを**読み出して** 1024px のマスタを描き、各 dpi へ縮小する
+（形も色もスクリプトは持たない）。`<group>` の変換や背景グラデーションの向きを変えたのに
+スクリプト側の定数を直し忘れた場合は、突き合わせに失敗して止まる。前景と
+`ic_launcher_monochrome.xml` は手で同期させること。
+
+前提は **macOS（`sips`）+ Google Chrome**（`CHROME=` で場所を指定できる）。CI では回さない
+（生成物はコミット済み）。
+
 ## 変更の出し方
 
 **`main` へ直接 push できない。** public repo なので ruleset `protect-main` を掛けてある
@@ -309,3 +347,6 @@ Play ストア経由ではないため、インストール時に「提供元不
 これは事故ではなく意図で、Android 版の作り手を公募した経緯に対する回答としてこの形にしている。
 
 コア（handball-toolkit）も MIT。
+
+**ランチャーアイコンも同じ扱い**（iOS 版から移植した意匠をそのまま MIT で配っている）。
+→ [アイコン](#アイコン)
