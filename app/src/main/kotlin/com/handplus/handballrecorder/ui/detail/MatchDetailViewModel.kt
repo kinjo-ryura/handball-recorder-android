@@ -13,9 +13,11 @@ import io.github.kinjoryura.handballtoolkit.PhaseSummaryLine
 import io.github.kinjoryura.handballtoolkit.Player
 import io.github.kinjoryura.handballtoolkit.PlayerId
 import io.github.kinjoryura.handballtoolkit.PlayerStatLine
+import io.github.kinjoryura.handballtoolkit.ScoreProgressionProjection
 import io.github.kinjoryura.handballtoolkit.TeamId
 import io.github.kinjoryura.handballtoolkit.TeamSummaryLine
 import io.github.kinjoryura.handballtoolkit.VideoSource
+import io.github.kinjoryura.handballtoolkit.buildScoreProgressionWithTimeline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +49,9 @@ data class PhaseStatBlock(val label: String, val line: PhaseSummaryLine)
  * **[MatchView] そのものを画面へ渡さない。** `resolver` はネイティブのハンドルで、
  * 画面が触れると FFI 呼び出しが再コンポーズのたびに走る。phase の逆引きは
  * ViewModel 側で 1 回だけ済ませ、ここには畳んだ結果だけを載せる。
+ *
+ * **試合詳細（[MatchDetailScreen]）とサマリ（[MatchSummaryScreen]）で 1 つを共有する。**
+ * どちらも同じ [MatchDetailViewModel] を読むので、取得も変換も 1 回で済む。
  */
 data class MatchDetailContent(
     val title: String,
@@ -66,6 +71,14 @@ data class MatchDetailContent(
     val phaseStats: List<PhaseStatBlock>,
     val homePlayerStats: List<PlayerStatLine>,
     val awayPlayerStats: List<PlayerStatLine>,
+    /**
+     * 得点差の推移。**null なら [MatchSummaryScreen] はその節ごと出さない**
+     * （得点が 1 つも無い / regular phase が無い試合ではコアが null を返す）。
+     *
+     * **これはハンドルではなく値**（`RustBuffer` から Kotlin 側へ写し取られた素の record）なので、
+     * `resolver` と違って画面へ渡しても FFI は走らないし close も要らない。
+     */
+    val scoreProgression: ScoreProgressionProjection?,
 )
 
 /**
@@ -139,8 +152,9 @@ class MatchDetailViewModel(
 /**
  * [MatchView] → [MatchDetailContent]。
  *
- * **FFI（`resolver`）に触るのはここだけ。** `allPhases()` と `phaseForMatchElapsed` を
- * この 1 回で使い切り、以降は畳んだ結果だけを画面へ渡す。
+ * **FFI に触るのはここだけ。** `allPhases()` / `phaseForMatchElapsed` /
+ * `buildScoreProgressionWithTimeline` をこの 1 回で使い切り、以降は畳んだ結果だけを画面へ渡す
+ * （`resolver` は [MatchView] の中に置き去りにする）。
  */
 internal fun buildContent(view: MatchView): MatchDetailContent {
     val resolver = view.resolver
@@ -182,5 +196,8 @@ internal fun buildContent(view: MatchView): MatchDetailContent {
             PlayerStatsOrdering.linesForTeam(summary.playerStats, view.playersById, view.awayTeam.id),
             view.playersById,
         ),
+        // **`buildScoreProgression`（facts 版）ではなくこちら。** あちらは timeline を内部で
+        // もう一度組み立てて resolver を二度作る。既に持っているものを渡す。
+        scoreProgression = buildScoreProgressionWithTimeline(view.match, view.timeline),
     )
 }

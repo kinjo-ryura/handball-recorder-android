@@ -36,7 +36,6 @@ import com.handplus.handballrecorder.ui.labels.ControlLabel
 import com.handplus.handballrecorder.ui.labels.DateLabel
 import com.handplus.handballrecorder.ui.labels.FeedErrorLabel
 import com.handplus.handballrecorder.ui.labels.FeedSubject
-import com.handplus.handballrecorder.ui.labels.RateFormat
 import com.handplus.handballrecorder.ui.labels.displayName
 import com.handplus.handballrecorder.ui.labels.label
 import com.handplus.handballrecorder.ui.playback.PlaybackOffsets
@@ -46,26 +45,27 @@ import io.github.kinjoryura.handballtoolkit.ControlFact
 import io.github.kinjoryura.handballtoolkit.MatchFactPayload
 import io.github.kinjoryura.handballtoolkit.PlayEventKind
 import io.github.kinjoryura.handballtoolkit.PlayFact
-import io.github.kinjoryura.handballtoolkit.PlayerStatLine
 import io.github.kinjoryura.handballtoolkit.ResolvedFact
 import io.github.kinjoryura.handballtoolkit.VideoProvider
 import io.github.kinjoryura.handballtoolkit.VideoSource
-import io.github.kinjoryura.handballtoolkit.awayAttempts
-import io.github.kinjoryura.handballtoolkit.homeAttempts
-import io.github.kinjoryura.handballtoolkit.scoringRate
-import io.github.kinjoryura.handballtoolkit.shotAttempts
 
 /**
- * 試合詳細。上から **動画枠 / タイムライン / スタッツ**。
+ * 試合詳細。上から **動画枠 / スコア / タイムライン**。
+ *
+ * **スタッツはここに置かない。** 右上の「サマリ」から別画面（[MatchSummaryScreen]）で開く。
+ * iOS（`MatchDetailViewV2` の右上 →「サマリ」）に導線を合わせたもので、以前はこの画面の
+ * 下に inline で並べていた。**ハイライト詳細は変えていない** — iOS もあちらの右上は
+ * 「すべて再生」で、サマリの概念が当てはまらないため。
  *
  * **本文の描画を動画の有無に依存させない。** 配信 46 件の大半は PDF 由来のタイマー試合
  * （動画なし）で、動画が無いことは異常ではない。`videoSource` が null なら動画枠を出さず、
- * タイムラインとスタッツだけを描く。動画が**再生できなかった**ときも同じで、注記を足すだけで
+ * スコアとタイムラインだけを描く。動画が**再生できなかった**ときも同じで、注記を足すだけで
  * 本文はそのまま残す。
  *
  * **動画枠だけはスクロールしない**（リストの上に固定する）。理由は
  * [com.handplus.handballrecorder.ui.video.YouTubePlayerFrame] の説明を参照。
  *
+ * @param onOpenSummary 右上「サマリ」。[MatchSummaryScreen] への遷移に繋ぐ
  * @param onSeek 行タップで動画をその位置へ飛ばす（秒）。[player] の `seek` に繋ぐ
  * @param player 動画を持つ試合で使うプレイヤー。null なら動画枠を出さない
  *   （プレビューや、プレイヤーを用意できない経路のため）
@@ -74,6 +74,7 @@ import io.github.kinjoryura.handballtoolkit.shotAttempts
 fun MatchDetailScreen(
     slug: String,
     onBack: () -> Unit,
+    onOpenSummary: () -> Unit,
     onSeek: (Double) -> Unit,
     player: YouTubePlayerController?,
     viewModel: MatchDetailViewModel = viewModel(factory = MatchDetailViewModel.factory(slug)),
@@ -82,6 +83,7 @@ fun MatchDetailScreen(
     MatchDetailScreen(
         state = state,
         onBack = onBack,
+        onOpenSummary = onOpenSummary,
         onRetry = viewModel::retry,
         onSeek = onSeek,
         player = player,
@@ -94,6 +96,7 @@ fun MatchDetailScreen(
 fun MatchDetailScreen(
     state: MatchDetailUiState,
     onBack: () -> Unit,
+    onOpenSummary: () -> Unit,
     onRetry: () -> Unit,
     onSeek: (Double) -> Unit,
     player: YouTubePlayerController?,
@@ -104,6 +107,10 @@ fun MatchDetailScreen(
             TopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { TextButton(onClick = onBack) { Text("戻る") } },
+                // **読み込みの完了を待たずに出す**（iOS も toolbar の出し分けは
+                // ハイライトかどうかだけで、読み込み状態を見ない）。読み込み中に押しても
+                // サマリ側が同じ状態を共有しているので、あちらで読み込み表示になる。
+                actions = { TextButton(onClick = onOpenSummary) { Text("サマリ") } },
             )
         },
     ) { innerPadding ->
@@ -150,7 +157,7 @@ fun MatchDetailScreen(
  * このアプリで再生できる動画ソースだけを通す。
  *
  * `local` は iOS 端末内の PHAsset を指すので Android では開けない。**枠を出さずに
- * タイムラインとスタッツだけを描く**（動画なしの試合と同じ扱い）。
+ * スコアとタイムラインだけを描く**（動画なしの試合と同じ扱い）。
  */
 private fun playableVideoSource(source: VideoSource?): VideoSource? =
     source?.takeIf { it.provider == VideoProvider.YOUTUBE }
@@ -158,9 +165,10 @@ private fun playableVideoSource(source: VideoSource?): VideoSource? =
 @Composable
 private fun MatchDetailContentList(content: MatchDetailContent, onSeek: (Double) -> Unit) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        // 2. スコア（サマリ画面の大きいスコアとは別。ここは日付つきの 1 行見出し）。
         item { ScoreHeader(content) }
 
-        // 2. タイムライン。
+        // 3. タイムライン。
         item { SectionTitle("タイムライン") }
         if (content.timeline.isEmpty()) {
             item { EmptyNote("記録なし") }
@@ -181,32 +189,6 @@ private fun MatchDetailContentList(content: MatchDetailContent, onSeek: (Double)
                     onSeek = onSeek,
                 )
             }
-        }
-
-        // 3. スタッツ。
-        item { SectionTitle("チーム別") }
-        item { TeamStatsTable(content) }
-        item { SectionTitle("前後半別") }
-        if (content.phaseStats.isEmpty()) {
-            item { EmptyNote("記録なし") }
-        }
-        items(count = content.phaseStats.size, key = { "phase-stat-${content.phaseStats[it].line.phaseFactId}" }) { index ->
-            PhaseStatsBlock(block = content.phaseStats[index], content = content)
-        }
-        item { SectionTitle("選手別") }
-        item {
-            PlayerStatsTable(
-                teamName = content.homeTeamName,
-                lines = content.homePlayerStats,
-                content = content,
-            )
-        }
-        item {
-            PlayerStatsTable(
-                teamName = content.awayTeamName,
-                lines = content.awayPlayerStats,
-                content = content,
-            )
         }
     }
 }
@@ -250,8 +232,9 @@ private fun ScoreHeader(content: MatchDetailContent) {
     }
 }
 
+/** 節の見出し。**[MatchSummaryScreen] と共有する**（同じ package の内部部品）。 */
 @Composable
-private fun SectionTitle(text: String) {
+internal fun SectionTitle(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleMedium,
@@ -259,8 +242,9 @@ private fun SectionTitle(text: String) {
     )
 }
 
+/** 「記録なし」等の控えめな注記。**[MatchSummaryScreen] と共有する**。 */
 @Composable
-private fun EmptyNote(text: String) {
+internal fun EmptyNote(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,
@@ -442,113 +426,5 @@ private fun ControlRow(label: String, timeText: String, modifier: Modifier) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-/** チーム別（得点 / シュートミス / シュート数 / 成功率）。iOS `teamStatsCard` と同じ 4 行。 */
-@Composable
-private fun TeamStatsTable(content: MatchDetailContent) {
-    val home = content.homeTeamLine
-    val away = content.awayTeamLine
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        StatRow("", content.homeTeamName, content.awayTeamName, header = true)
-        StatRow("得点", "${home.goals}", "${away.goals}")
-        StatRow("シュートミス", "${home.shotMisses}", "${away.shotMisses}")
-        StatRow("シュート数", "${home.shotAttempts}", "${away.shotAttempts}")
-        StatRow("成功率", RateFormat.withFraction(home), RateFormat.withFraction(away))
-    }
-}
-
-/** 前後半別（phase ごとに 得点 / シュート数 / 成功率）。iOS `phaseStatBlock` と同じ 3 行。 */
-@Composable
-private fun PhaseStatsBlock(block: PhaseStatBlock, content: MatchDetailContent) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(text = block.label, style = MaterialTheme.typography.titleSmall)
-        StatRow("", content.homeTeamName, content.awayTeamName, header = true)
-        StatRow("得点", "${block.line.homeGoals}", "${block.line.awayGoals}")
-        StatRow("シュート数", "${block.line.homeAttempts}", "${block.line.awayAttempts}")
-        StatRow(
-            "成功率",
-            RateFormat.homeWithFraction(block.line),
-            RateFormat.awayWithFraction(block.line),
-        )
-    }
-}
-
-@Composable
-private fun StatRow(label: String, home: String, away: String, header: Boolean = false) {
-    val style = if (header) {
-        MaterialTheme.typography.labelSmall
-    } else {
-        MaterialTheme.typography.bodyMedium
-    }
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1.2f),
-        )
-        Text(text = home, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        Text(text = away, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-    }
-}
-
-/** 選手別（チームごと）。並びは [PlayerStatsOrdering]（得点降順 → 試投降順 → 名前順）。 */
-@Composable
-private fun PlayerStatsTable(teamName: String, lines: List<PlayerStatLine>, content: MatchDetailContent) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(
-            text = teamName,
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (lines.isEmpty()) {
-            EmptyNote("記録なし")
-            return@Column
-        }
-        PlayerStatRow("選手", "得点", "試投", "成功率", header = true)
-        lines.forEach { line ->
-            PlayerStatRow(
-                name = content.playersById[line.playerId]?.displayName ?: ControlLabel.UNKNOWN_PLAYER,
-                goals = "${line.goals}",
-                attempts = "${line.shotAttempts}",
-                rate = RateFormat.percent(line.scoringRate),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PlayerStatRow(
-    name: String,
-    goals: String,
-    attempts: String,
-    rate: String,
-    header: Boolean = false,
-) {
-    val style = if (header) {
-        MaterialTheme.typography.labelSmall
-    } else {
-        MaterialTheme.typography.bodyMedium
-    }
-    val color = if (header) {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Text(
-            text = name,
-            style = style,
-            color = color,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(2f),
-        )
-        Text(text = goals, style = style, color = color, modifier = Modifier.weight(1f))
-        Text(text = attempts, style = style, color = color, modifier = Modifier.weight(1f))
-        Text(text = rate, style = style, color = color, modifier = Modifier.weight(1f))
     }
 }
