@@ -3,7 +3,7 @@
 ハンドボール試合記録アプリ **HandballRecorder** の Android 版。**MIT ライセンスの public repo** で、
 Play ストアには出さず **APK を直接配布**する。
 
-iOS 版（[App Store](https://apps.apple.com/jp/app/id6762165079)・private repo）と同じコアを共有し、
+iOS 版（[App Store](https://apps.apple.com/jp/app/id6762165079)）と同じコアを共有し、
 ドメインロジックは [handball-toolkit](https://github.com/kinjo-ryura/handball-toolkit) の prebuilt `.aar`
 が持つ。このリポジトリが持つのは **UI（シェル）だけ**。
 
