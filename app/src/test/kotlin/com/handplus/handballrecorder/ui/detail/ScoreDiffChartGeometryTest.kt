@@ -82,6 +82,72 @@ class ScoreDiffChartGeometryTest {
         assertEquals("後半 05:00", ScoreDiffChartGeometry.timeLabel(2100.6, spans))
     }
 
+    // ── 境界に近すぎる目盛りの間引き（親リポ #278）──
+
+    /**
+     * 配信中の鹿児島 vs 富山（前半 1657 秒 / 後半 1707 秒）。前半が 5 分の倍数で終わらないので
+     * `前半 25:00` が境界の 157 秒手前に落ち、`後半 00:00` のラベルと重なる。
+     */
+    private val realSpans = listOf(
+        span(regularIndex = 0, start = 0.0, end = 1657.0),
+        span(regularIndex = 1, start = 1657.0, end = 3364.0),
+    )
+
+    @Test
+    fun `次の phase 開始に近すぎる末尾の目盛りは落とす`() {
+        // ラベル 1 行が縦に占める秒数（実機の 340dp - 20dp の図で行高 18dp 相当）。
+        val ticks = ScoreDiffChartGeometry.yTickSeconds(3364.0, realSpans, minSeparationSeconds = 189.0)
+        assertEquals(
+            // `前半 25:00`（1500.0）だけが消える。残りは触らない。
+            listOf(0.0, 300.0, 600.0, 900.0, 1200.0, 1657.0, 1957.0, 2257.0, 2557.0, 2857.0, 3157.0),
+            ticks,
+        )
+        // 落とすのは手前側。境界そのもの（= 破線の位置・後半 00:00）は必ず残る。
+        assertTrue(ticks.contains(1657.0))
+    }
+
+    @Test
+    fun `間隔が足りていれば落とさない`() {
+        // 157 秒空いていれば足りる、という閾値なら `前半 25:00` は残る。
+        val ticks = ScoreDiffChartGeometry.yTickSeconds(3364.0, realSpans, minSeparationSeconds = 100.0)
+        assertTrue(ticks.contains(1500.0))
+    }
+
+    @Test
+    fun `既定では間引かない`() {
+        // 閾値を渡さない呼び出し（既存の挙動）は 1 本も落とさない。
+        assertTrue(ScoreDiffChartGeometry.yTickSeconds(3364.0, realSpans).contains(1500.0))
+    }
+
+    @Test
+    fun `phase の先頭は間引かない`() {
+        // 閾値が phase 丸ごとより大きくても、phase 名を出す唯一の目盛りは残す
+        // （全部落とすと図から phase の区切りが読めなくなる）。
+        val ticks = ScoreDiffChartGeometry.yTickSeconds(3364.0, realSpans, minSeparationSeconds = 100_000.0)
+        assertEquals(
+            listOf(0.0, 1657.0, 1957.0, 2257.0, 2557.0, 2857.0, 3157.0),
+            ticks,
+        )
+    }
+
+    @Test
+    fun `phase が無ければ閾値を渡しても間引かない`() {
+        // 通しで刻む経路には phase 境界が無いので、間引く理由も無い。
+        assertEquals(
+            listOf(0.0, 300.0, 600.0, 900.0),
+            ScoreDiffChartGeometry.yTickSeconds(900.0, emptyList(), minSeparationSeconds = 100_000.0),
+        )
+    }
+
+    @Test
+    fun `境界の目盛りは破線の位置として見分けられる`() {
+        // 描画側はここで実線のグリッドを引かない（破線が塗り潰されて実線に見えるため）。
+        assertTrue(ScoreDiffChartGeometry.isPhaseBoundary(1657.0, realSpans))
+        assertFalse(ScoreDiffChartGeometry.isPhaseBoundary(1200.0, realSpans))
+        // 1 本目の phase 開始は破線を引かないので境界ではない。
+        assertFalse(ScoreDiffChartGeometry.isPhaseBoundary(0.0, realSpans))
+    }
+
     // ── 座標変換 ──
 
     @Test

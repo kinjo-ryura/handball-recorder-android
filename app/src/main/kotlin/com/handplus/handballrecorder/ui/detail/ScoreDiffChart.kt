@@ -118,20 +118,46 @@ internal fun ScoreDiffChart(
             )
 
             // ── 横のグリッドと時間ラベル（縦軸 = 経過時間。上が開始）──
-            ScoreDiffChartGeometry.yTickSeconds(total, progression.phaseSpans).forEach { seconds ->
+            // ラベル 1 行が縦に占める秒数。目盛りは phase 起点で刻むので、前半が 5 分の倍数で
+            // 終わらない試合では末尾の目盛りが境界の直前に落ち、ラベル同士が重なる（親リポ #278）。
+            // **重なるかどうかの判定は幾何側**（[ScoreDiffChartGeometry.yTickSeconds]）に任せ、
+            // ここは実測したラベル高を秒へ換算して渡すだけにする。
+            val labelConstraints = Constraints(maxWidth = gutterLeft.toInt())
+            val labelHeight = measurer.measure(
+                text = ScoreDiffChartGeometry.timeLabel(0.0, progression.phaseSpans),
+                style = labelStyle,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                constraints = labelConstraints,
+            ).size.height
+            val minSeparationSeconds = if (plotHeight > 0f && total > 0.0) {
+                total * (labelHeight + LABEL_MIN_GAP.toPx()) / plotHeight
+            } else {
+                0.0
+            }
+
+            ScoreDiffChartGeometry.yTickSeconds(
+                totalSeconds = total,
+                spans = progression.phaseSpans,
+                minSeparationSeconds = minSeparationSeconds,
+            ).forEach { seconds ->
                 val py = gutterTop + ScoreDiffChartGeometry.y(seconds, total, plotHeight)
-                drawLine(
-                    color = gridColor,
-                    start = Offset(gutterLeft, py),
-                    end = Offset(size.width, py),
-                    strokeWidth = GRID_WIDTH.toPx(),
-                )
+                // 境界の目盛りには下で破線を引く。ここで実線も引くと**破線が塗り潰されて
+                // 実線に見える**ので、phase の区切りという意味が図から消える。
+                if (!ScoreDiffChartGeometry.isPhaseBoundary(seconds, progression.phaseSpans)) {
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(gutterLeft, py),
+                        end = Offset(size.width, py),
+                        strokeWidth = GRID_WIDTH.toPx(),
+                    )
+                }
                 val layout = measurer.measure(
                     text = ScoreDiffChartGeometry.timeLabel(seconds, progression.phaseSpans),
                     style = labelStyle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    constraints = Constraints(maxWidth = gutterLeft.toInt()),
+                    constraints = labelConstraints,
                 )
                 // 目盛りの中央に置くが、上下は図の中へ押し込める（0 秒のラベルが
                 // 得点差ラベルの行へせり上がると重なって読めなくなる）。
@@ -209,6 +235,14 @@ private val Y_LABEL_GUTTER = 76.dp
 
 /** 得点差ラベルを置く上の余白。 */
 private val X_LABEL_GUTTER = 20.dp
+
+/**
+ * 隣り合う時間ラベルの間に最低限空ける余白。
+ *
+ * 0 だとラベルの箱がちょうど接する（＝重なりはしないが文字が詰まって読めない）ので、
+ * 行の高さに上乗せして間引きの閾値にする。
+ */
+private val LABEL_MIN_GAP = 2.dp
 
 private val GRID_WIDTH = 1.dp
 private val ZERO_LINE_WIDTH = 1.dp
