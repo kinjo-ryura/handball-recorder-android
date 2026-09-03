@@ -92,6 +92,11 @@ dependencies {
     // @Preview のレンダラは debug ビルドにだけ入れる（release へ持ち込むと無駄に太る）。
     debugImplementation("androidx.compose.ui:ui-tooling")
 
+    // 全画面のシステムバー制御（WindowInsetsControllerCompat）で直接使う。activity /
+    // lifecycle が推移的に持ち込んでもいるが、**使うものは自分で宣言する**（推移で
+    // 手に入るかどうかは相手の都合で変わる）。版は現状の解決結果に合わせてある。
+    implementation("androidx.core:core-ktx:1.13.1")
+
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.1")

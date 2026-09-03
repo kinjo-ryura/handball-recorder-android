@@ -46,7 +46,10 @@ import kotlin.coroutines.resume
  * `@JavascriptInterface` のコールバックは WebView の JavaBridge スレッドで来るので、
  * 状態は [MutableStateFlow]、main を要る処理は [runOnMain] を通す。
  */
-class YouTubePlayerController(context: Context) : AutoCloseable {
+class YouTubePlayerController(
+    context: Context,
+    private val fullscreenHost: WebViewFullscreenHost? = null,
+) : AutoCloseable {
 
     private val context: Context = context
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -66,6 +69,20 @@ class YouTubePlayerController(context: Context) : AutoCloseable {
 
     /** 画面が購読する状態（`ready` / `error` / 再生中か）。 */
     val state: StateFlow<YouTubePlayerState> = _state.asStateFlow()
+
+    /**
+     * 全画面中か。**戻るキーを全画面の脱出に使ってよいか**の判定に画面が購読する
+     * （[YouTubePlayerFrame] の `BackHandler`）。
+     *
+     * Activity を辿れず全画面に対応できない場合は常に false。
+     */
+    val isFullscreen: StateFlow<Boolean> =
+        fullscreenHost?.isActive ?: MutableStateFlow(false).asStateFlow()
+
+    /** 全画面を抜ける（戻るキーから呼ぶ）。全画面でなければ何もしない。 */
+    fun exitFullscreen() {
+        runOnMain { fullscreenHost?.hide() }
+    }
 
     /**
      * `WebView` は**遅延生成**する。
@@ -186,6 +203,9 @@ class YouTubePlayerController(context: Context) : AutoCloseable {
         runOnMain {
             if (isDestroyed) return@runOnMain
             isDestroyed = true
+            // **全画面のまま画面を離れさせない。** 抜けずに壊すと、載せた view だけが
+            // decor view に残り、向きは横固定・システムバーは非表示のままになる。
+            fullscreenHost?.hide()
             if (!webViewLazy.isInitialized()) return@runOnMain
             val view = webViewLazy.value
             // destroy() は親に付いたままだと不正。先に外す。
@@ -223,10 +243,25 @@ class YouTubePlayerController(context: Context) : AutoCloseable {
         // 端末のファイルもコンテンツプロバイダも読ませない（HTML は assets から流し込む）。
         settings.allowFileAccess = false
         settings.allowContentAccess = false
-        // 素の WebChromeClient を置く。**全画面ボタンは押しても何も起きない**
-        // （onShowCustomView を実装していない）が、RMF 上ボタン自体を消してはいけないので
-        // `fs` は既定のまま残す。全画面対応は別途。
-        webChromeClient = WebChromeClient()
+        // 全画面の受け口。`YT.Player` の全画面ボタンは document fullscreen を要求するだけで、
+        // 応えるのはホスト側の責任（ここが無いとボタンは押しても何も起きない）。
+        // 実際に view を載せるのは [WebViewFullscreenHost]。
+        webChromeClient = object : WebChromeClient() {
+            override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+                val host = fullscreenHost
+                if (host == null) {
+                    // Activity を辿れなかった場合。**断ったことを Chromium へ返す** —
+                    // 黙って捨てると web 側が「全画面中」のまま取り残される。
+                    callback.onCustomViewHidden()
+                    return
+                }
+                host.show(view, callback)
+            }
+
+            override fun onHideCustomView() {
+                fullscreenHost?.hide()
+            }
+        }
         webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String?) {
                 handleHostingHtmlLoaded()

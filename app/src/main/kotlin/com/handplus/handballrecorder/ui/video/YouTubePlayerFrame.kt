@@ -1,5 +1,6 @@
 package com.handplus.handballrecorder.ui.video
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +32,12 @@ import io.github.kinjoryura.handballtoolkit.VideoSource
 @Composable
 fun rememberYouTubePlayerController(): YouTubePlayerController {
     val context = LocalContext.current
-    val controller = remember(context) { YouTubePlayerController(context) }
+    // 全画面 view の載せ先は Activity の decor view なので、ここで辿っておく。
+    // 辿れなければ null を渡す（全画面に対応しないだけで、再生は今までどおり動く）。
+    val fullscreenHost = remember(context) {
+        context.findActivity()?.let(::WebViewFullscreenHost)
+    }
+    val controller = remember(context) { YouTubePlayerController(context, fullscreenHost) }
     DisposableEffect(controller) {
         onDispose { controller.close() }
     }
@@ -63,10 +69,15 @@ fun YouTubePlayerFrame(
     modifier: Modifier = Modifier,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
+    val isFullscreen by controller.isFullscreen.collectAsStateWithLifecycle()
 
     LaunchedEffect(controller, videoSource.externalId) {
         controller.load(videoSource.externalId)
     }
+
+    // 全画面中の戻るキーは**画面遷移ではなく全画面の脱出**にする。ここは NavHost の
+    // 中身なので、この BackHandler のほうが後に登録されて先に効く。
+    BackHandler(enabled = isFullscreen) { controller.exitFullscreen() }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Box(
