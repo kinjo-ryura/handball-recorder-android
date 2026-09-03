@@ -368,6 +368,24 @@ wrapper を黙って実行しないことに意味がある）。コアの `.aar
 **ジョブ名 `check` は ruleset の required status check と一致している。** 変えるなら
 ruleset 側も同時に変えること（片方だけ変えると PR が永久にマージできなくなる）。
 
+**CI の Action は完全な commit SHA でピン留めしてある**（handball-project#284）。可変タグは
+差し替えが効くので、奪われるとランナーで任意コードが走る。**タグ参照に戻すと CI が起動しない**
+（リポジトリ設定で SHA ピン留めを必須にしてある）。追随は `.github/dependabot.yml` が週次で
+PR を出すので手で追わなくてよい。
+
+手で引き直すときは**タグを peel した commit** を取ること:
+
+```sh
+git ls-remote https://github.com/gradle/actions 'refs/tags/v4^{}'
+```
+
+**`refs/tags/<tag>` だけを引くと annotated tag では tag オブジェクトの SHA が返り、commit では
+ない。** `gradle/actions` がこれで、そのまま貼ると解決できない参照になる。
+
+**Gradle 依存の Dependabot は Compose 系を除外している。** 最新は AGP 9.1.0 以上と
+compileSdk 37 以上を要求して落ちるため（上の「バージョンの対応関係」）、1 依存だけを上げる PR は
+必ず赤くなる。一式で上げると決めた時点で `dependabot.yml` の `ignore` を外すこと。
+
 ### リリースを出すとき
 
 **APK の SHA-256 はリリースのたびに変わる。** 署名した APK の値を取り、Release 本文へ
