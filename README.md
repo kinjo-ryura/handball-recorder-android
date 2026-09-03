@@ -132,11 +132,7 @@ tail = 6 秒なので 6 秒未満の間隔は重なり、素直に飛ぶと巻�
 別々に持っています。混ぜないこと。なお**行タップの扱いは web デモと意図的に違い**、
 止まっているときは単発シーク（3 秒手前）、通し再生中はそのシーンからの再開になります。
 
-残っているのは配布まわり（署名鍵・APK 配布導線）と、下の「既知の制限」です。
-
-既知の制限: プレーヤーの**全画面ボタンは押しても何も起きません**（`WebChromeClient` の
-`onShowCustomView` を実装していないため）。ボタン自体は消しません — コントロールを隠すのは
-RMF に触れるからで、対応は別途入れます。
+残っているのは配布まわり（署名鍵・APK 配布導線）です。
 
 **Room の DB 層（`db/`）と 15 メソッドの write repository（`RoomWriteRepositories.kt`）は
 残してあります。** 見る専用 MVP は端末に保存しないのでどちらも通りませんが、記録機能を
@@ -191,10 +187,40 @@ YouTube の Android ライブラリは使わない。
 | `ui/video/JsLiterals.kt` | JS へ渡す値のリテラル化（純関数） |
 | `ui/video/YouTubePlayerFrame.kt` | Compose への載せ方（`AndroidView` と破棄） |
 | `ui/playback/ClipPlaybackController.kt` | 通し再生。プレーヤーへは `ClipPlaybackTarget`（`seek` / `pause` / `currentTimeSeconds` の 3 つだけ）を通して触る |
+| `ui/video/FullscreenState.kt` | 全画面の出入りの規則（純関数） |
+| `ui/video/WebViewFullscreenHost.kt` | 全画面 view の載せ先・向きの固定・システムバーの制御 |
 
 通し再生がプレーヤーに出す指示も **`YT.Player` の公式メソッド 1:1**（`seekTo` + `playVideo` /
 `pauseVideo` / `getCurrentTime`）に限ってある。**通し再生のためにコントロールを隠さないこと** —
 連続再生画面は `minimalControls` を使いたくなる場所だが、それは上の 1 点目に触れる。
+
+### 全画面
+
+`YT.Player` の全画面ボタンは document fullscreen を**要求するだけ**で、応えるのはホスト側の
+責任である。`WebChromeClient.onShowCustomView` / `onHideCustomView` を実装していないと、
+ボタンは出ているのに押しても何も起きない。**ボタンを消して解決してはいけない**（コントロールを
+隠すのは上の禁止事項 1 に触れる）。
+
+- 渡された view は **`window.decorView` へ直接 add する**。Compose のツリーには載せない —
+  この view の所有者は Chromium で、寿命も付け外しの順序も `WebChromeClient` の契約が決めている
+- 全画面中は **`SENSOR_LANDSCAPE`**（左右どちらの横向きにも追従する。`LANDSCAPE` だと端末を
+  逆さに持った利用者に上下逆の映像を見せる）。抜けるときは**入る前の値へ戻す**
+- システムバーは隠し、**縁からのスワイプで一時的に戻せる**ようにする
+  （`BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`）
+- 抜ける経路は 3 つ（プレーヤーの縮小ボタン / 戻るキー / 画面を離れる）あるが、**すべて
+  `WebViewFullscreenHost.hide()` の 1 か所を通す**。とくに画面を離れる経路が抜けていると、
+  一覧へ戻った後も横向き固定・システムバー非表示のままになる
+- **全画面 view の上には何も重ねない**（禁止事項 2）。戻るための UI も足していない
+
+出入りの規則 — 二重に入らない・抜けるのが冪等・向きを入る前の値へ戻す — は
+`ui/video/FullscreenState.kt` に純関数として切り出し、単体テストで固定してある。
+冪等性は飾りではなく、戻るキーで抜けるときに `onCustomViewHidden()` が Chromium 側の
+fullscreen を解き、その結果 `onHideCustomView` が返ってくるため、**同じ経路が必ず 2 回通る**。
+
+**`MainActivity` の `configChanges` はこの機能の前提である。** 宣言が無いと向きが変わるたびに
+Activity が作り直され、`WebView` を持つコントローラごと捨てられる（= 動画が頭に戻る）。
+全画面は入るときに向きを横へ固定するので、宣言が無いと入った瞬間に再生成が走って全画面が
+成立しない。ついでに、**それまであった「端末を回すと動画が頭に戻る」も消えている。**
 
 `org.json` を使わず JSON の decode を自前で持っているのは、**JVM 単体テストでは `org.json` が
 スタブ**（呼ぶと既定値を返すだけ）になり CI で検証できないため。依存を増やさずに
@@ -255,6 +281,7 @@ devShell に入るたびに wrapper のピン留めと一致するかを検査�
 | Compose コンパイラプラグイン | 2.1.21 | `org.jetbrains.kotlin.plugin.compose`。**Kotlin と完全一致が必要**（Kotlin 2.0 以降はコンパイラ同梱） |
 | Compose BOM | 2025.06.01 | compose-ui 1.8.3 / material3 1.3.2 を決める |
 | activity-compose | 1.10.1 | **BOM の管轄外**（BOM が版を決めるのは `androidx.compose.*` だけ） |
+| core-ktx | 1.13.1 | 全画面のシステムバー制御（`WindowInsetsControllerCompat`）。推移的にも入るが、使うものは自分で宣言する |
 | lifecycle-viewmodel-compose / lifecycle-runtime-compose | 2.9.1 | 同上 |
 | navigation-compose | 2.9.0 | 同上 |
 | Room | 2.7.2 | |
