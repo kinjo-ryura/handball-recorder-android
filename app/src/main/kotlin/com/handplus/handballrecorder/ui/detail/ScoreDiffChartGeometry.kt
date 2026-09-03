@@ -5,6 +5,7 @@ import com.handplus.handballrecorder.ui.labels.PhaseLabel
 import io.github.kinjoryura.handballtoolkit.ScoreProgressionPhaseSpan
 import io.github.kinjoryura.handballtoolkit.ScoreProgressionPoint
 import io.github.kinjoryura.handballtoolkit.diff
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.round
@@ -81,8 +82,15 @@ object ScoreDiffChartGeometry {
      * 縦軸の目盛り（試合の累積経過秒）。0 秒から [Y_TICK_SECONDS] 刻みで、`totalSeconds` を含むまで。
      *
      * iOS は負値で返す（Swift Charts の y が上向きのため）が、こちらは px 座標に合わせて正で返す。
+     *
+     * [minSeparationSeconds] は**隣り合うラベルが重ならないために要る最小の間隔**（秒）。
+     * 描画側がラベルの実測高から換算して渡す（→ [ScoreDiffChart]）。0 なら間引かない。
      */
-    fun yTickSeconds(totalSeconds: Double, spans: List<ScoreProgressionPhaseSpan> = emptyList()): List<Double> {
+    fun yTickSeconds(
+        totalSeconds: Double,
+        spans: List<ScoreProgressionPhaseSpan> = emptyList(),
+        minSeparationSeconds: Double = 0.0,
+    ): List<Double> {
         if (spans.isEmpty()) {
             val ticks = mutableListOf<Double>()
             var seconds = 0.0
@@ -97,14 +105,29 @@ object ScoreDiffChartGeometry {
         // 後半の目盛りが `04:59` のような半端な位置に落ちる。目盛りは「phase 内の 5 分」を
         // 指したいので、位置そのものを phase 起点で作る。
         val ticks = mutableListOf<Double>()
-        for (span in spans) {
+        for ((index, span) in spans.withIndex()) {
+            val phaseTicks = mutableListOf<Double>()
             var within = 0.0
             while (span.startSeconds + within <= span.endSeconds + 0.5 &&
                 span.startSeconds + within <= totalSeconds + 0.5
             ) {
-                ticks += span.startSeconds + within
+                phaseTicks += span.startSeconds + within
                 within += Y_TICK_SECONDS
             }
+            // **phase の末尾の目盛りは、次の phase の開始に近すぎれば落とす。**
+            // 刻みは phase 起点なので、前半が 5 分の倍数で終わらない試合（= 配信データの大半）
+            // では最後の目盛りが境界の直前に落ちる。鹿児島 vs 富山（前半 1657 秒）だと
+            // `前半 25:00` と `後半 00:00` が 157 秒 = 約 15dp しか離れず、行高 16dp の
+            // ラベル同士が重なったうえ、境界の破線がその潰れた帯を貫く（親リポ #278）。
+            // **落とすのは手前側**（次の phase の 0 分は破線の位置そのもので、図の意味の
+            // 区切りを担うため）。phase の先頭は phase 名を出す唯一の目盛りなので残す。
+            val nextStart = spans.getOrNull(index + 1)?.startSeconds
+            if (nextStart != null && minSeparationSeconds > 0.0) {
+                while (phaseTicks.size > 1 && nextStart - phaseTicks.last() < minSeparationSeconds) {
+                    phaseTicks.removeAt(phaseTicks.lastIndex)
+                }
+            }
+            ticks += phaseTicks
         }
         return ticks
     }
@@ -156,6 +179,15 @@ object ScoreDiffChartGeometry {
      */
     fun phaseBoundarySeconds(spans: List<ScoreProgressionPhaseSpan>): List<Double> =
         spans.drop(1).map { it.startSeconds }
+
+    /**
+     * その目盛りが phase 境界（= [phaseBoundarySeconds] が破線を引く位置）かどうか。
+     *
+     * 描画側は**ここで実線のグリッドを引かない**。同じ位置に実線と破線を重ねると破線の隙間が
+     * 実線で埋まり、phase の区切りという意味が図から消えるため（親リポ #278）。
+     */
+    fun isPhaseBoundary(seconds: Double, spans: List<ScoreProgressionPhaseSpan>): Boolean =
+        phaseBoundarySeconds(spans).any { abs(it - seconds) <= EPSILON }
 
     /**
      * 累積経過秒 → 縦軸のラベル（`前半 05:00`）。
