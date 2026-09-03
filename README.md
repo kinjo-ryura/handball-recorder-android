@@ -341,11 +341,75 @@ wrapper を黙って実行しないことに意味がある）。コアの `.aar
 **ジョブ名 `check` は ruleset の required status check と一致している。** 変えるなら
 ruleset 側も同時に変えること（片方だけ変えると PR が永久にマージできなくなる）。
 
+### リリースを出すとき
+
+**APK の SHA-256 はリリースのたびに変わる。** 署名した APK の値を取り、Release 本文へ
+その回のぶんとして書く（下の「本物かどうかを確かめる」が読者を Release 本文へ送っている）。
+
+```sh
+shasum -a 256 handball-recorder-android.apk
+```
+
+**署名証明書のフィンガープリントは鍵を替えるまで変わらない。** README の表と
+https://hand-plus.com/handball-recorder/android/ を直すのは鍵を替えたときだけで、
+それは `applicationId` を変える事態と同時に起きる。
+
+**古いハッシュを貼りっぱなしにしないこと。** 合わない値が載っていると確かめた人に偽の
+警告を出すことになり、次からは誰も確かめなくなる。載せないより悪い。
+
 ## インストール（利用者向け）
 
 APK は [Releases](https://github.com/kinjo-ryura/handball-recorder-android/releases) で配布する。
 Play ストア経由ではないため、インストール時に「提供元不明のアプリ」の許可と Play Protect の
-警告の突破が要る。手順は [hand-plus.com](https://hand-plus.com/) に用意する。
+警告の突破が要る。手順は
+[hand-plus.com](https://hand-plus.com/handball-recorder/android/) に用意する。
+
+### 本物かどうかを確かめる
+
+ストア配布ではストアが「配布元がいつもと同じか」を保証するが、**直配布ではその保証が消える**。
+上の手順は警告を通すことを案内するので、**何を見れば本物と判断できるか**をここに置く。
+
+**恒久的な基準は署名証明書のフィンガープリント**である。APK のハッシュはリリースのたびに
+変わるが、証明書は鍵を替えるまで変わらない。
+
+| | 値 |
+|---|---|
+| 証明書 SHA-256 | `58eb75be3bcbbf7d2c6d58567e024db455738911743164a5da093777e1c5e20d` |
+| 所有者 / 発行者 | `CN=kinjo-ryura, O=hand-plus, C=JP` |
+| 鍵 | RSA 4096 / SHA384withRSA |
+| 有効期限 | 2054-01-17 |
+
+確かめ方。**JDK があれば追加のインストールは要らない**:
+
+```sh
+keytool -printcert -jarfile handball-recorder-android.apk
+```
+
+`SHA256:` の行が上の値と一致すれば同じ鍵で署名されている。**keytool は表示を
+`58:EB:75:…` と大文字・コロン区切りにする**（値は同じ。目で比べるときは区切りを外す）。
+**改ざんされた APK ではフィンガープリントを表示せずエラーで止まる**（JDK 21 で実測）。
+
+Android SDK の build-tools があるなら、署名方式まで出る方でもよい:
+
+```sh
+apksigner verify --verbose --print-certs handball-recorder-android.apk
+```
+
+配布中の APK は **v2 + v3 方式**で署名している（**v1 は付いていない**）。
+`keytool -printcert -jarfile` は v1 が無くても v2 / v3 の署名ブロックから読む。
+
+ファイルそのものが配布物と同一かは、**各 Release の本文に載せた APK の SHA-256** で確かめる:
+
+```sh
+shasum -a 256 handball-recorder-android.apk               # macOS / Linux
+certutil -hashfile handball-recorder-android.apk SHA256   # Windows
+```
+
+**`.sha256` は Release 資産に同梱しない。** APK と同じ場所に置いたチェックサムは、APK を
+差し替えられる者に同時に差し替えられるので保証を足さない。効くのは**差し替えに痕跡が残る
+場所に基準値があること**のほうで、この README は commit として履歴に残り fork にも複製され、
+`main` は PR 必須で保護されている（上の「変更の出し方」）。Release 資産は黙って差し替えられる。
+ファイル単体のハッシュは GitHub 自身が資産のダイジェスト（API の `digest`）として持っている。
 
 ## ライセンスと fork について
 
