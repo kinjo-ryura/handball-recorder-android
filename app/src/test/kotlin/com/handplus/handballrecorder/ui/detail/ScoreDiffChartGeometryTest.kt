@@ -85,47 +85,54 @@ class ScoreDiffChartGeometryTest {
     // ── 境界に近すぎる目盛りの間引き（親リポ #278）──
 
     /**
-     * 配信中の鹿児島 vs 富山（前半 1657 秒 / 後半 1707 秒）。前半が 5 分の倍数で終わらないので
-     * `前半 25:00` が境界の 157 秒手前に落ち、`後半 00:00` のラベルと重なる。
+     * 配信中の鹿児島 vs 富山の実測値（前半 1501 秒 / 後半 1499 秒 / 通算 3000 秒）。
+     *
+     * **動画時刻から引き算した値ではない。** 動画上は前半が 1657 秒あるが、試合時計は
+     * タイムアウト中に進まないので 1501 秒になる（停止 3 回で 156 秒）。この差を取り違えると
+     * 「境界まで 157 秒ある」と読めてしまい、重なりの深さを見誤る。
+     *
+     * 前半が 5 分の倍数で終わらないため、最後の刻み 1500 秒が境界の **1 秒手前**に落ちる。
+     * 図の高さ 320dp では 0.1dp で、行高 16dp のラベルがほぼ完全に重なる。
      */
     private val realSpans = listOf(
-        span(regularIndex = 0, start = 0.0, end = 1657.0),
-        span(regularIndex = 1, start = 1657.0, end = 3364.0),
+        span(regularIndex = 0, start = 0.0, end = 1501.0),
+        span(regularIndex = 1, start = 1501.0, end = 3000.0),
     )
 
     @Test
     fun `次の phase 開始に近すぎる末尾の目盛りは落とす`() {
-        // ラベル 1 行が縦に占める秒数（実機の 340dp - 20dp の図で行高 18dp 相当）。
-        val ticks = ScoreDiffChartGeometry.yTickSeconds(3364.0, realSpans, minSeparationSeconds = 189.0)
+        // ラベル 1 行が縦に占める秒数。実機（図の高さ 320dp / 行高 16dp + 余白 2dp）で
+        // 3000 * 18 / 320 ≒ 169 秒になる。
+        val ticks = ScoreDiffChartGeometry.yTickSeconds(3000.0, realSpans, minSeparationSeconds = 169.0)
         assertEquals(
-            // `前半 25:00`（1500.0）だけが消える。残りは触らない。
-            listOf(0.0, 300.0, 600.0, 900.0, 1200.0, 1657.0, 1957.0, 2257.0, 2557.0, 2857.0, 3157.0),
+            // 前半の最後の刻み（1500.0）だけが消える。残りは触らない。
+            listOf(0.0, 300.0, 600.0, 900.0, 1200.0, 1501.0, 1801.0, 2101.0, 2401.0, 2701.0),
             ticks,
         )
-        // 落とすのは手前側。境界そのもの（= 破線の位置・後半 00:00）は必ず残る。
-        assertTrue(ticks.contains(1657.0))
+        // 落とすのは手前側。境界そのもの（= 破線の位置）は必ず残る。
+        assertTrue(ticks.contains(1501.0))
     }
 
     @Test
     fun `間隔が足りていれば落とさない`() {
-        // 157 秒空いていれば足りる、という閾値なら `前半 25:00` は残る。
-        val ticks = ScoreDiffChartGeometry.yTickSeconds(3364.0, realSpans, minSeparationSeconds = 100.0)
+        // 境界までは 1 秒あるので、それより小さい閾値なら 1500.0 は残る。
+        val ticks = ScoreDiffChartGeometry.yTickSeconds(3000.0, realSpans, minSeparationSeconds = 0.5)
         assertTrue(ticks.contains(1500.0))
     }
 
     @Test
     fun `既定では間引かない`() {
         // 閾値を渡さない呼び出し（既存の挙動）は 1 本も落とさない。
-        assertTrue(ScoreDiffChartGeometry.yTickSeconds(3364.0, realSpans).contains(1500.0))
+        assertTrue(ScoreDiffChartGeometry.yTickSeconds(3000.0, realSpans).contains(1500.0))
     }
 
     @Test
     fun `phase の先頭は間引かない`() {
         // 閾値が phase 丸ごとより大きくても、phase 名を出す唯一の目盛りは残す
         // （全部落とすと図から phase の区切りが読めなくなる）。
-        val ticks = ScoreDiffChartGeometry.yTickSeconds(3364.0, realSpans, minSeparationSeconds = 100_000.0)
+        val ticks = ScoreDiffChartGeometry.yTickSeconds(3000.0, realSpans, minSeparationSeconds = 100_000.0)
         assertEquals(
-            listOf(0.0, 1657.0, 1957.0, 2257.0, 2557.0, 2857.0, 3157.0),
+            listOf(0.0, 1501.0, 1801.0, 2101.0, 2401.0, 2701.0),
             ticks,
         )
     }
@@ -142,7 +149,7 @@ class ScoreDiffChartGeometryTest {
     @Test
     fun `境界の目盛りは破線の位置として見分けられる`() {
         // 描画側はここで実線のグリッドを引かない（破線が塗り潰されて実線に見えるため）。
-        assertTrue(ScoreDiffChartGeometry.isPhaseBoundary(1657.0, realSpans))
+        assertTrue(ScoreDiffChartGeometry.isPhaseBoundary(1501.0, realSpans))
         assertFalse(ScoreDiffChartGeometry.isPhaseBoundary(1200.0, realSpans))
         // 1 本目の phase 開始は破線を引かないので境界ではない。
         assertFalse(ScoreDiffChartGeometry.isPhaseBoundary(0.0, realSpans))
