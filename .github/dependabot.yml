@@ -1,0 +1,40 @@
+# Dependabot の更新設定（handball-project#284）。
+#
+# **SHA ピン留めと対で要る。** Action を可変タグから完全な commit SHA へ固定した
+# （ci.yml）ので、放置すると上流の修正が入ってこない。手で `git ls-remote` を叩き直す
+# 運用は必ず忘れるため、機械に PR を出させる。SHA ピン留めしていても Dependabot は
+# SHA と末尾コメントのバージョンを両方書き換える。
+#
+# public リポなので無償。頻度は週次（開発は個人 1 人で、日次だと PR が溜まって
+# 読まれなくなる）。**PR は自動 merge しない** — main は ruleset `protect-main` で
+# PR + `check` green 必須にしてあり、依存の更新も人が中身を見て merge する。
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      gradle:
+        patterns: ['*']
+    ignore:
+      # **Compose 系はあえて最新を追っていない**（README「バージョンの対応関係」）。
+      # 最新は `checkDebugAarMetadata` が AGP 9.1.0 以上と compileSdk 37 以上を要求して
+      # 落ちる（2026-09-01 実測）。上げるには AGP・compileSdk・CI の `setup-android` が
+      # 入れる platform / build-tools まで一式で動かす必要があり、**1 依存だけを上げる
+      # PR では通らない**。機械に出させても毎週赤い PR が積まれるだけなので除外する。
+      # 一式で上げると決めた時点でこの ignore を外すこと。
+      - dependency-name: androidx.compose:compose-bom
+      - dependency-name: androidx.lifecycle:*
+      - dependency-name: androidx.navigation:navigation-compose
+      # コアの `.aar` は Maven ではなく handball-toolkit の Release から
+      # `app/libs/` に落として `implementation(files(...))` で読む（README「ビルド」）。
+      # Dependabot からは見えないので、版上げは向こうのリリースに合わせて手で行う。
