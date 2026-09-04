@@ -193,18 +193,23 @@ object ScoreDiffChartGeometry {
      * 累積経過秒 → 縦軸のラベル（`前半 05:00`）。
      *
      * その秒が属する phase を見つけ、**phase 内の経過**を `mm:ss` にする（試合通算ではない）。
+     * **境界ちょうどの秒は「次の phase の開始」として読む**（下記）。
      * 最後の phase の終端を越えた目盛りは、iOS と同じくその phase の終端に丸める。
      *
      * **名前も書式もここで作らない** — phase 名は [PhaseLabel]、時刻は [ClockFormat] が持つ
      * （画面ごとに `when` を書くと同じ phase が別名になる。親リポ #165 / #175 / #216）。
      */
     fun timeLabel(cumulativeSeconds: Double, spans: List<ScoreProgressionPhaseSpan>): String {
-        val span = spans.firstOrNull { cumulativeSeconds <= it.endSeconds + EPSILON }
-        if (span != null) {
-            return label(span.regularIndex, cumulativeSeconds - span.startSeconds)
-        }
-        val last = spans.lastOrNull() ?: return ClockFormat.mmss(cumulativeSeconds)
-        return label(last.regularIndex, last.endSeconds - last.startSeconds)
+        if (spans.isEmpty()) return ClockFormat.mmss(cumulativeSeconds)
+        // **境界ちょうどの秒は次の phase の開始として読む。** 目盛りは phase 起点で刻むので
+        // （[yTickSeconds]）、境界に載る目盛りは次の phase の 0 分そのものであり、同じ行には
+        // 「ここから後半」を示す破線が引かれている（[phaseBoundarySeconds]）。前の phase の
+        // 終端として読むと、その行のラベルが `後半 00:00` ではなく `前半 25:01` になり、
+        // **後半の 00:00 が図から消えたように見える**（親リポ #292）。
+        val span = spans.lastOrNull { it.startSeconds <= cumulativeSeconds + EPSILON }
+            ?: spans.first()
+        val length = (span.endSeconds - span.startSeconds).coerceAtLeast(0.0)
+        return label(span.regularIndex, (cumulativeSeconds - span.startSeconds).coerceIn(0.0, length))
     }
 
     private fun label(regularIndex: Int, withinSeconds: Double): String =
