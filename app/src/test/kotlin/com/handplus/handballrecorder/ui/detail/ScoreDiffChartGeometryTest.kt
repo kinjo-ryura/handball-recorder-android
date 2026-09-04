@@ -271,9 +271,20 @@ class ScoreDiffChartGeometryTest {
         val spans = listOf(span(0, 0.0, 1800.0), span(1, 1800.0, 3600.0))
         assertEquals("前半 00:00", ScoreDiffChartGeometry.timeLabel(0.0, spans))
         assertEquals("前半 05:00", ScoreDiffChartGeometry.timeLabel(300.0, spans))
-        // 境界ちょうどは前の phase の終端（iOS の `<= endSeconds` と同じ）。
-        assertEquals("前半 30:00", ScoreDiffChartGeometry.timeLabel(1800.0, spans))
+        // 境界ちょうどは次の phase の開始（iOS `ScoreDiffChartV2.formatYLabel` と揃えてある。
+        // 親リポ #292 で両方を「前の phase の終端」から変えた）。
+        assertEquals("後半 00:00", ScoreDiffChartGeometry.timeLabel(1800.0, spans))
         assertEquals("後半 05:00", ScoreDiffChartGeometry.timeLabel(2100.0, spans))
+    }
+
+    @Test
+    fun `境界の目盛りは次の phase の 00 分として読む`() {
+        // 配信中の鹿児島 vs 富山（前半 1501 秒）で実際に出ていた表示。境界の目盛りには
+        // 「ここから後半」の破線が引かれるので、`前半 25:01` と名乗ると図と食い違う（#292）。
+        assertEquals("後半 00:00", ScoreDiffChartGeometry.timeLabel(1501.0, realSpans))
+        assertTrue(ScoreDiffChartGeometry.isPhaseBoundary(1501.0, realSpans))
+        // 境界の手前は前半のまま（間引かれずに残った場合に読み替えてしまわないこと）。
+        assertEquals("前半 25:00", ScoreDiffChartGeometry.timeLabel(1500.0, realSpans))
     }
 
     @Test
