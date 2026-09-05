@@ -71,8 +71,39 @@ jobs:
           curl -fsSL --retry 3 -o "app/libs/$aar" \
             "https://github.com/kinjo-ryura/handball-toolkit/releases/download/v${ver}/${aar}"
 
+      # 落とした .aar の SHA-256 をリポにコミットした値と照合する（handball-project#285）。
+      # Release のアセットはタグと違って後から差し替えられるので、版が合っているだけでは
+      # 「toolkit のリリース時と同じバイナリ」を保証できない。期待値も版と同じく
+      # app/build.gradle.kts に置く（三重管理を避ける。版を上げるときは 2 行セットで直す）。
+      # 一致しなければ、Release 側が差し替わったか、期待値の更新漏れ。どちらかを人が判断する。
+      - name: コアの .aar の SHA-256 を照合
+        run: |
+          set -euo pipefail
+          aar=$(ls app/libs/handball-toolkit-*.aar)
+          expected=$(sed -n 's/.*toolkitAarSha256 = \([0-9a-f]\{64\}\).*/\1/p' app/build.gradle.kts)
+          if [ -z "$expected" ]; then
+            echo "app/build.gradle.kts に toolkitAarSha256 = <64 桁の hex> の行がありません。" >&2
+            exit 1
+          fi
+          actual=$(sha256sum "$aar" | cut -d' ' -f1)
+          echo "expected $expected"
+          echo "actual   $actual"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::$aar の SHA-256 が app/build.gradle.kts の期待値と一致しません。" >&2
+            echo "  Release のアセットが差し替わったか、版を上げたのに期待値の更新を忘れたかのどちらかです。" >&2
+            echo "  手元の .aar で確かめる: shasum -a 256 $aar" >&2
+            exit 1
+          fi
+
       - name: assembleDebug
         run: ./gradlew :app:assembleDebug --console=plain
+
+      # release は R8（minify + shrinkResources）を通る（handball-project#285）。ここで捕まるのは
+      # R8 の設定エラーと「参照先が無い」類のビルド時の壊れだけで、reflection 経由の実行時の
+      # 壊れ（JNA / Room）は捕まらない。そちらは配布前に端末で確かめる（README「リリースを出すとき」）。
+      # 署名設定は無いので unsigned APK が出る。配布物にはならない。
+      - name: assembleRelease（R8 を通す）
+        run: ./gradlew :app:assembleRelease --console=plain
 
       # 現時点でテストは 0 件（NO-SOURCE で素通りする）。足したときに黙って
       # 走らないままにならないよう、先に経路を通しておく。
