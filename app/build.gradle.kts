@@ -31,7 +31,22 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 で minify + リソース削減（handball-project#285）。配布 APK から未使用コードと
+            // クラス名・文字列を落とし、露出面を小さくする。
+            //
+            // **keep ルールが要るものは 2 つあり、どちらも消費側で書かない**:
+            //   - JNA（`Native.register` の reflection）と UniFFI 生成コード → コアの `.aar` が
+            //     consumer ProGuard ルールとして同梱している（handball-toolkit の
+            //     `android/toolkit/consumer-rules.pro`）
+            //   - Room の生成 DAO / DB 実装 → room-runtime の同梱ルール
+            // アプリ固有の追加ルールは proguard-rules.pro（いまは空。足すときは理由を書く）。
+            //
+            // **CI は assembleRelease まで回すが、R8 が壊すのは実行時（reflection）なので
+            // ビルドが通っても保証にならない。** 版を上げたら release ビルドを実機 /
+            // エミュレータに入れて YouTube 再生とデータ取得まで通すこと（README「リリースを出すとき」）。
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // 署名設定は置かない。ここは APK を直配布するリポジトリなので、debug 鍵で
             // 署名された release が「配布できる成果物」に見えてしまうほうが有害
             // （配布用の署名鍵は Releases を出すときに別途用意する）。
