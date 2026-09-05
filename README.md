@@ -456,6 +456,11 @@ certutil -hashfile handball-recorder-android.apk SHA256   # Windows
 `main` は PR 必須で保護されている（上の「変更の出し方」）。Release 資産は黙って差し替えられる。
 ファイル単体のハッシュは GitHub 自身が資産のダイジェスト（API の `digest`）として持っている。
 
+## セキュリティ上の問題を見つけたら
+
+公開 Issue ではなく [SECURITY.md](SECURITY.md) の手順（GitHub の Private vulnerability
+reporting）で報告してください。
+
 ## ライセンスと fork について
 
 **MIT**。fork して自分の名前で公開すること、課金することを含めて自由に使ってよい。
