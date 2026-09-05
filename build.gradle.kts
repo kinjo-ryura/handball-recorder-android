@@ -3,10 +3,10 @@
 // バージョンは Gradle（flake の pkgs.gradle）と互換な組み合わせで固定する。
 // 上げるときは README「バージョンの対応関係」も同時に直すこと。
 plugins {
-    id("com.android.application") version "8.11.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.1.21" apply false
+    id("com.android.application") version "9.4.0" apply false
+    id("org.jetbrains.kotlin.android") version "2.4.10" apply false
     // Compose コンパイラプラグイン。Kotlin 2.0 以降はコンパイラ本体と同梱なので、
     // **バージョンは Kotlin と完全一致でなければならない**（片方だけ上げると解決に失敗する）。
-    id("org.jetbrains.kotlin.plugin.compose") version "2.1.21" apply false
-    id("com.google.devtools.ksp") version "2.1.21-2.0.1" apply false
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.10" apply false
+    id("com.google.devtools.ksp") version "2.3.11" apply false
 }
