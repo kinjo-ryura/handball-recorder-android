@@ -162,6 +162,17 @@ suspend fun SampleFeed.loadHighlightView(slug: String): FeedResult<MatchView> =
  * 組み立ての例外を [FeedResult.Malformed] に畳む。
  *
  * 例外そのものは診断としてだけ持ち回る（[FeedResult.Malformed.diagnostic]）。
+ *
+ * **[RuntimeException] も畳む**（handball-project#285）。コアの構造化エラー 2 種の外で
+ * 起きうるのは、生成コードのマーシャリング（`IllegalArgumentException` / `IllegalStateException`）や
+ * `InternalException` で、配信 JSON が汚染されたときにここでプロセスを落とすより
+ * 「読めない」を画面に出すほうがよい。**[Throwable] まで広げない** — `OutOfMemoryError` や
+ * `UnsatisfiedLinkError` を「壊れた試合」として隠すと、環境側の故障が配信データの
+ * 問題に見える。
+ *
+ * **コアの panic はここでは捕まえられない。** コアは `panic = "abort"` でビルドされており
+ * （ADR 0004 / 0006）、panic は Kotlin 例外ではなくネイティブの abort としてプロセスを落とす。
+ * それは設計どおりで、catch 節を増やしても変わらない（README「コアとシェルの境界」）。
  */
 private inline fun buildCatching(build: () -> MatchView): FeedResult<MatchView> =
     try {
@@ -169,5 +180,7 @@ private inline fun buildCatching(build: () -> MatchView): FeedResult<MatchView> 
     } catch (e: SampleDtoException) {
         FeedResult.Malformed(e.toString())
     } catch (e: HighlightRouteException) {
+        FeedResult.Malformed(e.toString())
+    } catch (e: RuntimeException) {
         FeedResult.Malformed(e.toString())
     }

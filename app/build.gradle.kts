@@ -31,7 +31,22 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 で minify + リソース削減（handball-project#285）。配布 APK から未使用コードと
+            // クラス名・文字列を落とし、露出面を小さくする。
+            //
+            // **keep ルールが要るものは 2 つあり、どちらも消費側で書かない**:
+            //   - JNA（`Native.register` の reflection）と UniFFI 生成コード → コアの `.aar` が
+            //     consumer ProGuard ルールとして同梱している（handball-toolkit の
+            //     `android/toolkit/consumer-rules.pro`）
+            //   - Room の生成 DAO / DB 実装 → room-runtime の同梱ルール
+            // アプリ固有の追加ルールは proguard-rules.pro（いまは空。足すときは理由を書く）。
+            //
+            // **CI は assembleRelease まで回すが、R8 が壊すのは実行時（reflection）なので
+            // ビルドが通っても保証にならない。** 版を上げたら release ビルドを実機 /
+            // エミュレータに入れて YouTube 再生とデータ取得まで通すこと（README「リリースを出すとき」）。
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // 署名設定は置かない。ここは APK を直配布するリポジトリなので、debug 鍵で
             // 署名された release が「配布できる成果物」に見えてしまうほうが有害
             // （配布用の署名鍵は Releases を出すときに別途用意する）。
@@ -75,6 +90,13 @@ dependencies {
     //   - 手元でコアを直したとき: ./scripts/build_aar.sh の出力を libs/ へコピー
     // どちらも手順は examples/android/README.md「ビルドと実行」。
     implementation(files("libs/handball-toolkit-0.5.0.aar"))
+    // 上の .aar の SHA-256（handball-project#285）。CI は Release から落とした .aar をこれと照合する
+    // （Release のアセットはタグと違って後から差し替えられるので、版だけでは真正性を担保できない。
+    // Gradle wrapper の distributionSha256Sum と同じ思想）。**版を上げるときは 2 行セットで直す**:
+    //   shasum -a 256 app/libs/handball-toolkit-<版>.aar
+    // 手元でコアを直して build_aar.sh の出力を置いたときは一致しないが、照合は CI だけで行うので
+    // ローカルビルドは止まらない。
+    // toolkitAarSha256 = 31a7c1ee46649d333791565f9abba4d949c68cb7f4a9739f6e0c092ff646c95c
 
     // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM で、ローカルファイル
     // 参照では POM が介在しない）。そのため利用側がこの 2 つを自分で宣言する必要がある。

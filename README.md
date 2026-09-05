@@ -39,6 +39,14 @@ DB ハンドルとトランザクション境界、素朴な CRUD、ID / 時刻�
 **コアはユーザー向け文言を一切持たない**（エラーはコードとパラメータのみ）。日本語の文言は
 すべてこのリポジトリ側にある。
 
+**コアの panic は Kotlin 側で捕まえられない。** コアは `panic = "abort"` でビルドされている
+（[ADR 0004](https://github.com/kinjo-ryura/handball-toolkit/blob/main/docs/adr/0004-ios-ffi-boundary.md) /
+[ADR 0006](https://github.com/kinjo-ryura/handball-toolkit/blob/main/docs/adr/0006-android-distribution.md)）ので、
+panic はネイティブの abort としてプロセスを落とす。`try / catch` を増やしても変わらない。シェルが
+畳めるのは構造化エラー（`SampleDtoException` 等）と生成コードのマーシャリング例外（`RuntimeException`）
+までで、`Throwable` まで広げると `OutOfMemoryError` のような環境側の故障を「壊れた試合」として隠すことになる
+（`domain/MatchViewBuilder.kt` の `buildCatching`）。
+
 ## 現状
 
 **見る専用 MVP は一通り揃っています。** シード（handball-toolkit の
@@ -55,6 +63,7 @@ DB ハンドルとトランザクション境界、素朴な CRUD、ID / 時刻�
 | ハイライト詳細（シーン一覧 + 「このハイライトの記録」） | `ui/detail/HighlightDetailScreen.kt` |
 | **通し再生（「すべて再生」）** | `ui/playback/` |
 | YouTube の再生・行タップからのシーク | `ui/video/` |
+| **（未使用）** Room の write 経路 — シェル契約 3 trait / 15 メソッドの実装 | `RoomWriteRepositories.kt` / `db/`。**呼び出し側は 0 件**。記録機能の足場として残している（消すかどうかは「記録したい」が出た時点で決める）。R8 は Room の keep ルールで DB クラスを残すので、未使用でも APK からは消えない |
 
 **スタッツは試合詳細の下ではなく別画面です**（試合詳細の右上「サマリ」から開く）。
 iOS 版の導線（`MatchDetailViewV2` の右上 →「サマリ」→ `MatchSummaryViewV2`）に合わせたもので、
@@ -362,8 +371,13 @@ wrapper が正規の配布物かを照合する。fork される前提の public
 wrapper を黙って実行しないことに意味がある）。コアの `.aar` は handball-toolkit の Release から
 取るので、CI でも手元と同じく **Rust / NDK は要らない**。
 
-`.aar` の版は `app/build.gradle.kts` の 1 か所だけが持ち、CI はそこから読む。上げるときは
-そのファイルと上のバージョン表を直せばよい（workflow は触らない）。
+`.aar` の版と **SHA-256** は `app/build.gradle.kts` の 1 か所だけが持ち、CI はそこから読んで
+Release から落とした `.aar` を照合する（handball-project#285。Release のアセットはタグと違って
+後から差し替えられる）。上げるときはそのファイルの 2 行（`files("libs/…")` と `toolkitAarSha256`）と
+上のバージョン表を直せばよい（workflow は触らない）。値は `shasum -a 256 app/libs/handball-toolkit-<版>.aar`。
+
+CI は `assembleRelease` も回す（R8 の設定エラーはここで止まる）が、**R8 が壊すのは reflection 経由の
+実行時の参照で、ビルドが通っても保証にならない**（下の「リリースを出すとき」）。
 
 **ジョブ名 `check` は ruleset の required status check と一致している。** 変えるなら
 ruleset 側も同時に変えること（片方だけ変えると PR が永久にマージできなくなる）。
@@ -387,6 +401,12 @@ compileSdk 37 以上を要求して落ちるため（上の「バージョンの
 必ず赤くなる。一式で上げると決めた時点で `dependabot.yml` の `ignore` を外すこと。
 
 ### リリースを出すとき
+
+**release は R8 で minify されている**（handball-project#285）。JNA / UniFFI / Room は依存側の consumer
+ルールで keep されるが、これが効いているかは端末で動かして初めて分かる。**配布する APK を実機か
+エミュレータに入れて、一覧の取得（データ）→ 動画つきの試合を開く（YouTube 再生）→ 行タップの
+シークまで通すこと。** `UnsatisfiedLinkError` / `ClassNotFoundException` が logcat に出たら
+`app/proguard-rules.pro` に keep を足し、何が壊れたかを 1 行添える。
 
 **APK の SHA-256 はリリースのたびに変わる。** 署名した APK の値を取り、Release 本文へ
 その回のぶんとして書く（下の「本物かどうかを確かめる」が読者を Release 本文へ送っている）。

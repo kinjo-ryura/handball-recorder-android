@@ -8,7 +8,11 @@
     <!-- アイコンは 2 系統。API 26 以降は mipmap-anydpi-v26/ の adaptive icon が、
          API 24/25 は mipmap-*dpi/ の PNG が使われる（minSdk = 24 なので後者が要る）。
          roundIcon は端末側が丸いアイコンを求めたときだけ参照される。 -->
+    <!-- allowBackup は明示的に切る（handball-project#285）。既定（true）だと WebView の
+         domStorage（YouTube のセッション由来データ）が Google Drive のバックアップ対象に
+         入りうる。このアプリはユーザーの記録を持たないので、復元して嬉しいデータも無い。 -->
     <application
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
