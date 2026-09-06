@@ -1,6 +1,7 @@
 plugins {
+    // Kotlin は AGP 9 の内蔵サポートが供給するので、`org.jetbrains.kotlin.android` は
+    // 宣言しない（宣言するとエラーで止まる。理由はルートの build.gradle.kts）。
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     // 画面は Jetpack Compose。版はルートの build.gradle.kts が持つ（Kotlin と同一）。
     id("org.jetbrains.kotlin.plugin.compose")
     // Room の DAO 実装生成（kapt ではなく KSP）。
@@ -9,7 +10,10 @@ plugins {
 
 android {
     namespace = "com.handplus.handballrecorder"
-    compileSdk = 36
+    // API 37 からプラットフォームは minor 付きで配られる（`platforms;android-37.0` /
+    // `37.1` / `37.2`…）。`compileSdk = 37` は minor 無しの `android-37.0` を指すので、
+    // CI の setup-android にも `platforms;android-37.0` を入れさせること。
+    compileSdk = 37
     // nix が提供する SDK には build-tools が 1 つしか入っていないため明示する。
     // 既定値（AGP のバンドル値）を要求されると read-only な nix store の SDK へ
     // ダウンロードしようとして失敗する。
@@ -21,7 +25,7 @@ android {
         // API レベルと一致させる）。java.time が API 26 未満で使えない点は
         // coreLibraryDesugaring で解消する（下記）。
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "0.1"
 
@@ -101,13 +105,13 @@ dependencies {
     // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM で、ローカルファイル
     // 参照では POM が介在しない）。そのため利用側がこの 2 つを自分で宣言する必要がある。
     // 生成コードが Native.register で .so を dlopen するのに JNA、suspend 関数に coroutines。
-    implementation("net.java.dev.jna:jna:5.17.0@aar")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("net.java.dev.jna:jna:5.19.1@aar")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // ── 画面（Jetpack Compose / Material 3）──
     // BOM が版をまとめて決めるのは **androidx.compose.* だけ**。activity / lifecycle /
     // navigation は BOM の管轄外なので個別に版を書く（README のバージョン表と対応）。
-    implementation(platform("androidx.compose:compose-bom:2025.06.01"))
+    implementation(platform("androidx.compose:compose-bom:2026.08.00"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -117,17 +121,17 @@ dependencies {
     // 全画面のシステムバー制御（WindowInsetsControllerCompat）で直接使う。activity /
     // lifecycle が推移的に持ち込んでもいるが、**使うものは自分で宣言する**（推移で
     // 手に入るかどうかは相手の都合で変わる）。版は現状の解決結果に合わせてある。
-    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.core:core-ktx:1.19.0")
 
-    implementation("androidx.activity:activity-compose:1.10.1")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.1")
-    implementation("androidx.navigation:navigation-compose:2.9.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+    implementation("androidx.navigation:navigation-compose:2.10.0")
 
     // ── 永続化（シェルの責務。コアは DB を所有しない）──
-    implementation("androidx.room:room-runtime:2.7.2")
-    implementation("androidx.room:room-ktx:2.7.2")
-    ksp("androidx.room:room-compiler:2.7.2")
+    implementation("androidx.room:room-runtime:2.8.4")
+    implementation("androidx.room:room-ktx:2.8.4")
+    ksp("androidx.room:room-compiler:2.8.4")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 

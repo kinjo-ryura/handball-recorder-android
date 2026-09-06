@@ -39,10 +39,16 @@ jobs:
           java-version: '21'
 
       # ランナー同梱の SDK には buildToolsVersion = "37.0.0" が無い（app/build.gradle.kts が
-      # 明示している）。compileSdk = 36 と組で入れる。
+      # 明示している）。compileSdk = 37 と組で入れる。
+      #
+      # **プラットフォームのパッケージ名は `platforms;android-37.0` で、`android-37` ではない。**
+      # API 37 から minor 付きで配られるようになり（`37.0` / `37.1` / `37.2`…）、minor 無しの
+      # 名前は存在しない。`android-37` を渡すと sdkmanager は
+      # `Warning: Failed to find package 'platforms;android-37'` を出して終了コード 1 で落ちる
+      # （2026-09-06 実測）。**警告の文言に反して素通りはしない**ので、取り違えはここで止まる。
       - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
         with:
-          packages: 'platforms;android-36 build-tools;37.0.0'
+          packages: 'platforms;android-37.0 build-tools;37.0.0'
 
       # Gradle 本体は wrapper が供給する（flake ではない — README「nix を使う場合」）。
       # このアクションは依存のキャッシュに加え、**コミット済みの gradle-wrapper.jar が
@@ -105,8 +111,8 @@ jobs:
       - name: assembleRelease（R8 を通す）
         run: ./gradlew :app:assembleRelease --console=plain
 
-      # 現時点でテストは 0 件（NO-SOURCE で素通りする）。足したときに黙って
-      # 走らないままにならないよう、先に経路を通しておく。
+      # 純関数へ切り出した部分（ClipProgression / FullscreenState / ScoreDiffChartGeometry /
+      # YouTubeBridge ほか）を JVM 上で固定する。2026-09-06 時点で 19 クラス 205 件。
       - name: 単体テスト
         run: ./gradlew :app:testDebugUnitTest --console=plain
 
