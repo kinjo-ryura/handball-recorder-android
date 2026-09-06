@@ -252,6 +252,13 @@ Activity が作り直され、`WebView` を持つコントローラごと捨て�
   echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties   # コミットしない
   ```
 
+  要るパッケージは 2 つ。**プラットフォームは `android-37`（minor 無し）では取れない**
+  （下の「compileSdk 37 は `platforms;android-37.0`」）:
+
+  ```sh
+  sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
+  ```
+
 - ABI は **arm64-v8a 単独**（ADR 0006 決定 5）。エミュレータを使うなら同 ABI の AVD が要る
 
 **Rust / NDK は要らない。** コアは `.aar` の中に `.so` として入っている。
@@ -283,31 +290,61 @@ devShell に入るたびに wrapper のピン留めと一致するかを検査�
 
 | | バージョン | 備考 |
 |---|---|---|
-| Gradle | 8.14.4 | wrapper がピン留め（配布物の SHA-256 も固定） |
-| AGP | 8.11.1 | Gradle 8.13+ を要求 |
-| Kotlin | 2.1.21 | KSP・Compose コンパイラと組で上げること |
-| KSP | 2.1.21-2.0.1 | Kotlin と完全一致が必要 |
-| Compose コンパイラプラグイン | 2.1.21 | `org.jetbrains.kotlin.plugin.compose`。**Kotlin と完全一致が必要**（Kotlin 2.0 以降はコンパイラ同梱） |
-| Compose BOM | 2025.06.01 | compose-ui 1.8.3 / material3 1.3.2 を決める |
-| activity-compose | 1.10.1 | **BOM の管轄外**（BOM が版を決めるのは `androidx.compose.*` だけ） |
-| core-ktx | 1.13.1 | 全画面のシステムバー制御（`WindowInsetsControllerCompat`）。推移的にも入るが、使うものは自分で宣言する |
-| lifecycle-viewmodel-compose / lifecycle-runtime-compose | 2.9.1 | 同上 |
-| navigation-compose | 2.9.0 | 同上 |
-| Room | 2.7.2 | |
+| Gradle | 9.7.1 | wrapper がピン留め（配布物の SHA-256 も固定）。AGP 9 は Gradle 9.1+ を要求 |
+| AGP | 9.4.0 | **Kotlin サポートを内蔵する**（下記） |
+| Kotlin | 2.4.10 | **プラグインとしては宣言しない。** 版は Compose コンパイラプラグインが連れてくる（下記） |
+| KSP | 2.3.11 | **2.3.x から Kotlin と別系列**（以前の `<Kotlin>-<KSP>` 形式ではない）。完全一致は不要 |
+| Compose コンパイラプラグイン | 2.4.10 | `org.jetbrains.kotlin.plugin.compose`。**Kotlin と完全一致が必要**（Kotlin 2.0 以降はコンパイラ同梱） |
+| Compose BOM | 2026.08.00 | `androidx.compose.*` の版を決める |
+| activity-compose | 1.13.0 | **BOM の管轄外**（BOM が版を決めるのは `androidx.compose.*` だけ） |
+| core-ktx | 1.19.0 | 全画面のシステムバー制御（`WindowInsetsControllerCompat`）。推移的にも入るが、使うものは自分で宣言する |
+| lifecycle-viewmodel-compose / lifecycle-runtime-compose | 2.11.0 | 同上 |
+| navigation-compose | 2.10.0 | 同上 |
+| Room | 2.8.4 | |
 | handball-toolkit | 0.5.1 | `app/libs/handball-toolkit-0.5.1.aar` |
-| JNA | 5.17.0（`@aar`） | **`.aar` は依存情報を運ばない**ので利用側で宣言する |
-| kotlinx-coroutines | 1.10.2 | 同上 |
-| compileSdk / targetSdk | 36 | `buildToolsVersion = "37.0.0"` を明示 |
+| JNA | 5.19.1（`@aar`） | **`.aar` は依存情報を運ばない**ので利用側で宣言する |
+| kotlinx-coroutines | 1.11.0 | 同上 |
+| compileSdk / targetSdk | 37 | プラットフォームのパッケージ名は **`platforms;android-37.0`**（下記）。`buildToolsVersion = "37.0.0"` を明示 |
 | minSdk | 24 | `java.time` を使うため `coreLibraryDesugaring` が要る |
 
-**Compose 系はあえて最新を追っていない。** ここに書いた組は Kotlin 2.1.21 / AGP 8.11.1 と
-同世代のもの。最新（compose-bom 2026.08.00 / lifecycle 2.11.0 / navigation-compose 2.10.0）は
-`checkDebugAarMetadata` が **AGP 9.1.0 以上と compileSdk 37 以上を要求して落ちる**
-（2026-09-01 に実測）。**上げるなら AGP・compileSdk・CI の `setup-android` が入れる
-platform / build-tools まで一式で動かすこと。**
+#### Kotlin プラグインは宣言しない（AGP 9 の内蔵 Kotlin）
 
-lint は `GradleDependency` で「もっと新しい版がある」と言い続けるが、これは警告であって
-ビルドは通る（AGP・JNA・coroutines についても以前から同じ警告が出ている）。
+**`org.jetbrains.kotlin.android` を書いてはいけない。** AGP 9.0 から Kotlin サポートが AGP に
+内蔵され、このプラグインは不要になっただけでなく**宣言していること自体がビルドを止める**:
+
+```
+Failed to apply plugin 'org.jetbrains.kotlin.android'.
+  The 'org.jetbrains.kotlin.android' plugin is no longer required for Kotlin support since AGP 9.0.
+```
+
+→ [AGP 内蔵 Kotlin への移行](https://kotl.in/gradle/agp-built-in-kotlin)
+
+**そのため Kotlin の版を書く場所が無い。** AGP 9.4.0 が既定で連れてくる KGP は 2.2.10 だが、
+`compose-compiler-gradle-plugin:2.4.10` が `kotlin-gradle-plugin:2.4.10` に依存するので、
+buildscript のクラスパス解決（同一モジュールは最大版が勝つ）で **2.4.10 になる**。
+つまり**ルートの `build.gradle.kts` にある Compose コンパイラプラグインの版が、そのまま
+このプロジェクトの Kotlin 版**である。両者は元から完全一致が要求される関係なので二重管理には
+ならない。確かめ方:
+
+```sh
+./gradlew buildEnvironment | grep kotlin-gradle-plugin   # 2.2.10 -> 2.4.10 と出る
+```
+
+#### compileSdk 37 は `platforms;android-37.0`
+
+**API 37 からプラットフォームは minor 付きで配られる**（`37.0` / `37.1` / `37.2`…）。
+`android-37` というパッケージは**存在しない**ので、`sdkmanager "platforms;android-37"` は
+`Warning: Failed to find package` を出して終了コード 1 で落ちる（2026-09-06 実測）。
+`compileSdk = 37` が指すのは minor 無しの `android-37.0` で、CI の `setup-android` に
+渡すのもこの名前。
+
+```sh
+sdkmanager "platforms;android-37.0"
+```
+
+lint は `GradleDependency` で「もっと新しい版がある」と言い続けることがあるが、これは警告で
+あってビルドは通る。**2026-09-06 の一式更新の時点では 0 件**（残っている lint 警告 4 件は
+`EmptySuperCall` ×2 / `ChromeOsAbiSupport` / `DataExtractionRules` で、いずれも版とは無関係）。
 
 ## アイコン
 
@@ -396,9 +433,11 @@ git ls-remote https://github.com/gradle/actions 'refs/tags/v4^{}'
 **`refs/tags/<tag>` だけを引くと annotated tag では tag オブジェクトの SHA が返り、commit では
 ない。** `gradle/actions` がこれで、そのまま貼ると解決できない参照になる。
 
-**Gradle 依存の Dependabot は Compose 系を除外している。** 最新は AGP 9.1.0 以上と
-compileSdk 37 以上を要求して落ちるため（上の「バージョンの対応関係」）、1 依存だけを上げる PR は
-必ず赤くなる。一式で上げると決めた時点で `dependabot.yml` の `ignore` を外すこと。
+**Gradle 依存の Dependabot に除外は無い。** 以前は Compose 系（compose-bom /
+`androidx.lifecycle:*` / navigation-compose）を `ignore` していたが、これは最新が AGP 9.1.0 以上と
+compileSdk 37 以上を要求して落ち、1 依存だけを上げる PR が必ず赤くなったため。**AGP 9.4.0 /
+compileSdk 37 へ一式で上げた 2026-09-06 にその前提が消えたので除外も畳んだ**
+（handball-project#299）。`dependabot.yml` に `ignore` を戻さないこと。
 
 ### リリースを出すとき
 

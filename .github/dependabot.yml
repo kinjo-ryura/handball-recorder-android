@@ -18,6 +18,15 @@ updates:
       actions:
         patterns: ['*']
 
+  # **除外（`ignore:`）は 1 件も置かない。** Compose 系（compose-bom /
+  # `androidx.lifecycle:*` / navigation-compose）を外していたのは、最新が
+  # `checkDebugAarMetadata` で AGP 9.1.0 以上と compileSdk 37 以上を要求して落ちたため
+  # （2026-09-01 実測）。**AGP 9.4.0 / compileSdk 37 へ一式で上げた 2026-09-06 に
+  # その前提が消えたので除外も畳んだ**（handball-project#299）。ここへ戻さないこと。
+  #
+  # コアの `.aar` だけは Maven ではなく handball-toolkit の Release から `app/libs/` に
+  # 落として `implementation(files(...))` で読むため（README「ビルド」）、そもそも
+  # Dependabot からは見えない。版上げは向こうのリリースに合わせて手で行う。
   - package-ecosystem: gradle
     directory: /
     schedule:
@@ -25,16 +34,3 @@ updates:
     groups:
       gradle:
         patterns: ['*']
-    ignore:
-      # **Compose 系はあえて最新を追っていない**（README「バージョンの対応関係」）。
-      # 最新は `checkDebugAarMetadata` が AGP 9.1.0 以上と compileSdk 37 以上を要求して
-      # 落ちる（2026-09-01 実測）。上げるには AGP・compileSdk・CI の `setup-android` が
-      # 入れる platform / build-tools まで一式で動かす必要があり、**1 依存だけを上げる
-      # PR では通らない**。機械に出させても毎週赤い PR が積まれるだけなので除外する。
-      # 一式で上げると決めた時点でこの ignore を外すこと。
-      - dependency-name: androidx.compose:compose-bom
-      - dependency-name: androidx.lifecycle:*
-      - dependency-name: androidx.navigation:navigation-compose
-      # コアの `.aar` は Maven ではなく handball-toolkit の Release から
-      # `app/libs/` に落として `implementation(files(...))` で読む（README「ビルド」）。
-      # Dependabot からは見えないので、版上げは向こうのリリースに合わせて手で行う。
