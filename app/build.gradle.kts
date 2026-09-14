@@ -93,14 +93,14 @@ dependencies {
     //   - 外部利用者と同じ: GitHub Release から .aar をダウンロードして libs/ へ置く
     //   - 手元でコアを直したとき: ./scripts/build_aar.sh の出力を libs/ へコピー
     // どちらも手順は examples/android/README.md「ビルドと実行」。
-    implementation(files("libs/handball-toolkit-0.5.1.aar"))
+    implementation(files("libs/handball-toolkit-0.11.0.aar"))
     // 上の .aar の SHA-256（handball-project#285）。CI は Release から落とした .aar をこれと照合する
     // （Release のアセットはタグと違って後から差し替えられるので、版だけでは真正性を担保できない。
     // Gradle wrapper の distributionSha256Sum と同じ思想）。**版を上げるときは 2 行セットで直す**:
     //   shasum -a 256 app/libs/handball-toolkit-<版>.aar
     // 手元でコアを直して build_aar.sh の出力を置いたときは一致しないが、照合は CI だけで行うので
     // ローカルビルドは止まらない。
-    // toolkitAarSha256 = 4ed1f5d11c0d3ef4673d335a7ddb72abc15e6a9375dff0991779413cc18481c5
+    // toolkitAarSha256 = 068d10b0f348d5f8d97d01c2d252e9b5af73a1e06c93354b1134dffe4e12c4e9
 
     // .aar ファイル単体は依存情報を運ばない（運ぶのは Maven の POM で、ローカルファイル
     // 参照では POM が介在しない）。そのため利用側がこの 2 つを自分で宣言する必要がある。

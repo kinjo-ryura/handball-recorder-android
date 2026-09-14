@@ -266,7 +266,7 @@ Activity が作り直され、`WebView` を持つコントローラごと捨て�
 ```sh
 # コアの .aar を Releases から落とす（app/libs/ はコミットしない）
 mkdir -p app/libs
-gh release download v0.5.1 --repo kinjo-ryura/handball-toolkit --pattern '*.aar' --dir app/libs
+gh release download v0.11.0 --repo kinjo-ryura/handball-toolkit --pattern '*.aar' --dir app/libs
 
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
@@ -301,7 +301,7 @@ devShell に入るたびに wrapper のピン留めと一致するかを検査�
 | lifecycle-viewmodel-compose / lifecycle-runtime-compose | 2.11.0 | 同上 |
 | navigation-compose | 2.10.0 | 同上 |
 | Room | 2.8.4 | |
-| handball-toolkit | 0.5.1 | `app/libs/handball-toolkit-0.5.1.aar` |
+| handball-toolkit | 0.11.0 | `app/libs/handball-toolkit-0.11.0.aar` |
 | JNA | 5.19.1（`@aar`） | **`.aar` は依存情報を運ばない**ので利用側で宣言する |
 | kotlinx-coroutines | 1.11.0 | 同上 |
 | compileSdk / targetSdk | 37 | プラットフォームのパッケージ名は **`platforms;android-37.0`**（下記）。`buildToolsVersion = "37.0.0"` を明示 |
