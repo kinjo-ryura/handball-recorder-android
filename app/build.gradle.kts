@@ -111,7 +111,7 @@ dependencies {
     // ── 画面（Jetpack Compose / Material 3）──
     // BOM が版をまとめて決めるのは **androidx.compose.* だけ**。activity / lifecycle /
     // navigation は BOM の管轄外なので個別に版を書く（README のバージョン表と対応）。
-    implementation(platform("androidx.compose:compose-bom:2026.08.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -126,12 +126,12 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
-    implementation("androidx.navigation:navigation-compose:2.10.0")
+    implementation("androidx.navigation:navigation-compose:2.10.1")
 
     // ── 永続化（シェルの責務。コアは DB を所有しない）──
-    implementation("androidx.room:room-runtime:2.8.4")
-    implementation("androidx.room:room-ktx:2.8.4")
-    ksp("androidx.room:room-compiler:2.8.4")
+    implementation("androidx.room:room-runtime:2.8.5")
+    implementation("androidx.room:room-ktx:2.8.5")
+    ksp("androidx.room:room-compiler:2.8.5")
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
