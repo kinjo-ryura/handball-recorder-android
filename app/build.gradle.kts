@@ -139,4 +139,7 @@ dependencies {
     // CI の `check` が `:app:testDebugUnitTest` を回すので、テストが 0 件のままにならないよう
     // ここで実行系を宣言する。**アプリ本体の依存は増やさない**（testImplementation は APK に入らない）。
     testImplementation("junit:junit:4.13.2")
+    // `factLog` の ORDER BY をコアと共有する fixture と突き合わせる（FactPersistenceOrderTest。
+    // handball-project#405）。JVM には Android の SQLite が無いので sqlite-jdbc で同じ SQL を実行する。
+    testImplementation("org.xerial:sqlite-jdbc:3.53.4.0")
 }
