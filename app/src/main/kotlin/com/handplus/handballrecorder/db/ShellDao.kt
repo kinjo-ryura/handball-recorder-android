@@ -78,7 +78,8 @@ interface ShellDao {
     suspend fun deleteFactsOfMatch(matchId: String)
 
     /**
-     * **永続化順**で返す（コアの `persistence_order` と同じ規約 — 時刻 → recordedAt → id）。
+     * **永続化順**で返す（コアの `persistence_order` と同じ規約 — 動画秒を持つか → 時刻 →
+     * phase 開始か → recordedAt → id）。
      * validators の入力契約が「facts は永続化順でソート済み」を要求するため、
      * 読み出し順を合わせるのはシェルの責務。
      *
@@ -90,6 +91,9 @@ interface ShellDao {
      *   matchClock だけの fact と videoClock の秒を同じ数直線で比べないため
      * - 第 2 キー: どちらの時計も持たない fact を末尾へ寄せる（SQLite の ASC は NULL を先頭に置くため）
      * - 第 3 キー: videoClock、無ければ matchClock
+     * - 第 4 キー: 同じ時刻なら phase 開始を先に置く（handball-project#401 / #405）。タイマーモードの
+     *   phase は記録した瞬間に作られるので、その phase の最初の記録と phase 開始は同じ時刻を持つ。
+     *   どちらが先かは種別で決まり、recordedAt（記録した実時刻）の順は発火順と一致する保証が無い
      */
     @Query(
         """
@@ -98,6 +102,7 @@ interface ShellDao {
           (startVideoSeconds IS NULL) ASC,
           (startMatchSeconds IS NULL AND startVideoSeconds IS NULL) ASC,
           COALESCE(startVideoSeconds, startMatchSeconds) ASC,
+          (payloadKind != 'phaseStart') ASC,
           recordedAtEpochSecond ASC,
           recordedAtNano ASC,
           id ASC

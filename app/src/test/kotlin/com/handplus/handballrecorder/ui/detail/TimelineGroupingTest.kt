@@ -104,6 +104,33 @@ class TimelineGroupingTest {
     }
 
     @Test
+    fun `境界の記録が phase 開始より前に並んでいても次の phase に入る`() {
+        // 配信サンプル（2025-12-18-m12 など）は 30:00 の得点が「後半の開始」より前に書かれていて、
+        // TimelineOrdering は同じ時刻を元の並びのまま残す。行の所属は並びではなく
+        // phaseFactIdAt（コアの半開区間 [start, end)）で決まるので、得点は後半の見出しの下に入り、
+        // 後から来る phase 開始が「後半」の見出しを 2 つ作ることもない（handball-project#405）。
+        val first = UUID.randomUUID()
+        val second = UUID.randomUUID()
+        val firstGoal = play(match = 10.0)
+        val boundaryGoal = play(match = 1800.0)
+        val secondGoal = play(match = 2000.0)
+        val groups = TimelineGrouping.groups(
+            orderedFacts = listOf(
+                phaseStart(first, match = 0.0),
+                firstGoal,
+                boundaryGoal,
+                phaseStart(second, match = 1800.0),
+                secondGoal,
+            ),
+            phaseLabelByFactId = mapOf(first to "前半", second to "後半"),
+            phaseFactIdAt = { seconds -> if (seconds < 1800.0) first else second },
+        )
+        assertEquals(listOf("前半", "後半"), groups.map { it.label })
+        assertEquals(listOf(firstGoal), groups[0].facts)
+        assertEquals(listOf(boundaryGoal, secondGoal), groups[1].facts)
+    }
+
+    @Test
     fun `possession は行にしない`() {
         // CV 出力は 1 試合に 110〜200 件入り、出すと得点やカードが埋もれる（親リポ #217）。
         val phaseId = UUID.randomUUID()
