@@ -12,12 +12,12 @@
 // 完全一致が要求される関係にあるため二重管理にはならない。
 // 上げるときは README「バージョンの対応関係」も同時に直すこと。
 plugins {
-    id("com.android.application") version "9.4.0" apply false
+    id("com.android.application") version "9.4.1" apply false
     // Compose コンパイラプラグイン。Kotlin 2.0 以降はコンパイラ本体と同梱なので、
     // **バージョンは Kotlin と完全一致でなければならない**（片方だけ上げると解決に失敗する）。
-    id("org.jetbrains.kotlin.plugin.compose") version "2.4.10" apply false
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.20" apply false
     // KSP は 2.3.x から Kotlin と別系列の版を持つ（以前の `<Kotlin>-<KSP>` 形式ではない）。
     // Kotlin と完全一致させる必要はなくなったが、対応する Kotlin の範囲は KSP の
     // リリースノートが決めるので、Kotlin を上げたらここも見ること。
-    id("com.google.devtools.ksp") version "2.3.11" apply false
+    id("com.google.devtools.ksp") version "2.3.12" apply false
 }
