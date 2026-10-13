@@ -5,9 +5,9 @@
 // エラーになる**（"The 'org.jetbrains.kotlin.android' plugin is no longer required for
 // Kotlin support since AGP 9.0"）。→ https://kotl.in/gradle/agp-built-in-kotlin
 //
-// **Kotlin の版を決めるのは下の compose プラグインである。** AGP 9.4.0 が既定で連れてくる
-// KGP は 2.2.10 だが、compose-compiler-gradle-plugin:2.4.10 が kotlin-gradle-plugin:2.4.10 に
-// 依存するので、buildscript のクラスパス解決（同一モジュールは最大版が勝つ）で 2.4.10 になる。
+// **Kotlin の版を決めるのは下の compose プラグインである。** AGP 9.4.1 が既定で連れてくる
+// KGP は 2.2.10 だが、compose-compiler-gradle-plugin:2.4.20 が kotlin-gradle-plugin:2.4.20 に
+// 依存するので、buildscript のクラスパス解決（同一モジュールは最大版が勝つ）で 2.4.20 になる。
 // **つまり compose プラグインの版 = このプロジェクトの Kotlin 版**で、両者は元から
 // 完全一致が要求される関係にあるため二重管理にはならない。
 // 上げるときは README「バージョンの対応関係」も同時に直すこと。
