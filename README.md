@@ -290,17 +290,17 @@ devShell に入るたびに wrapper のピン留めと一致するかを検査�
 
 | | バージョン | 備考 |
 |---|---|---|
-| Gradle | 9.7.1 | wrapper がピン留め（配布物の SHA-256 も固定）。AGP 9 は Gradle 9.1+ を要求 |
-| AGP | 9.4.0 | **Kotlin サポートを内蔵する**（下記） |
-| Kotlin | 2.4.10 | **プラグインとしては宣言しない。** 版は Compose コンパイラプラグインが連れてくる（下記） |
-| KSP | 2.3.11 | **2.3.x から Kotlin と別系列**（以前の `<Kotlin>-<KSP>` 形式ではない）。完全一致は不要 |
-| Compose コンパイラプラグイン | 2.4.10 | `org.jetbrains.kotlin.plugin.compose`。**Kotlin と完全一致が必要**（Kotlin 2.0 以降はコンパイラ同梱） |
-| Compose BOM | 2026.08.00 | `androidx.compose.*` の版を決める |
+| Gradle | 9.8.0 | wrapper がピン留め（配布物の SHA-256 も固定）。AGP 9 は Gradle 9.1+ を要求 |
+| AGP | 9.4.1 | **Kotlin サポートを内蔵する**（下記） |
+| Kotlin | 2.4.20 | **プラグインとしては宣言しない。** 版は Compose コンパイラプラグインが連れてくる（下記） |
+| KSP | 2.3.12 | **2.3.x から Kotlin と別系列**（以前の `<Kotlin>-<KSP>` 形式ではない）。完全一致は不要 |
+| Compose コンパイラプラグイン | 2.4.20 | `org.jetbrains.kotlin.plugin.compose`。**Kotlin と完全一致が必要**（Kotlin 2.0 以降はコンパイラ同梱） |
+| Compose BOM | 2026.09.00 | `androidx.compose.*` の版を決める |
 | activity-compose | 1.13.0 | **BOM の管轄外**（BOM が版を決めるのは `androidx.compose.*` だけ） |
-| core-ktx | 1.19.0 | 全画面のシステムバー制御（`WindowInsetsControllerCompat`）。推移的にも入るが、使うものは自分で宣言する |
+| core-ktx | 1.19.1 | 全画面のシステムバー制御（`WindowInsetsControllerCompat`）。推移的にも入るが、使うものは自分で宣言する |
 | lifecycle-viewmodel-compose / lifecycle-runtime-compose | 2.11.0 | 同上 |
-| navigation-compose | 2.10.0 | 同上 |
-| Room | 2.8.4 | |
+| navigation-compose | 2.10.2 | 同上 |
+| Room | 2.8.5 | |
 | handball-toolkit | 0.11.0 | `app/libs/handball-toolkit-0.11.0.aar` |
 | JNA | 5.19.1（`@aar`） | **`.aar` は依存情報を運ばない**ので利用側で宣言する |
 | kotlinx-coroutines | 1.11.0 | 同上 |
@@ -319,15 +319,15 @@ Failed to apply plugin 'org.jetbrains.kotlin.android'.
 
 → [AGP 内蔵 Kotlin への移行](https://kotl.in/gradle/agp-built-in-kotlin)
 
-**そのため Kotlin の版を書く場所が無い。** AGP 9.4.0 が既定で連れてくる KGP は 2.2.10 だが、
-`compose-compiler-gradle-plugin:2.4.10` が `kotlin-gradle-plugin:2.4.10` に依存するので、
-buildscript のクラスパス解決（同一モジュールは最大版が勝つ）で **2.4.10 になる**。
+**そのため Kotlin の版を書く場所が無い。** AGP 9.4.1 が既定で連れてくる KGP は 2.2.10 だが、
+`compose-compiler-gradle-plugin:2.4.20` が `kotlin-gradle-plugin:2.4.20` に依存するので、
+buildscript のクラスパス解決（同一モジュールは最大版が勝つ）で **2.4.20 になる**。
 つまり**ルートの `build.gradle.kts` にある Compose コンパイラプラグインの版が、そのまま
 このプロジェクトの Kotlin 版**である。両者は元から完全一致が要求される関係なので二重管理には
 ならない。確かめ方:
 
 ```sh
-./gradlew buildEnvironment | grep kotlin-gradle-plugin   # 2.2.10 -> 2.4.10 と出る
+./gradlew buildEnvironment | grep kotlin-gradle-plugin   # 2.2.10 -> 2.4.20 と出る
 ```
 
 #### compileSdk 37 は `platforms;android-37.0`
