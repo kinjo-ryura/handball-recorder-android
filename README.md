@@ -17,8 +17,8 @@ iOS 版（[App Store](https://apps.apple.com/jp/app/id6762165079)）と同じコ
 | タイムライン / スタッツ表示 | 端末への保存（開くたびに取得する） |
 | YouTube 再生とシーク | ローカル動画 / 2 台同期録画 / Play ストア公開 |
 
-試合データは [handball-sample-matches](https://github.com/kinjo-ryura/handball-sample-matches) が
-配信する v2 スキーマの JSON を取得する。同じ内容は web でも見られる
+試合データは [handball-match-data](https://github.com/kinjo-ryura/handball-match-data) が
+配信する JSON（形は同リポの `SCHEMA.md`）を取得する。同じ内容は web でも見られる
 （[hand-plus.com/handball-recorder/demo/](https://hand-plus.com/handball-recorder/demo/)）。
 
 記録機能を足すかどうかは、配った相手から「記録したい」が出た時点で判断する。
