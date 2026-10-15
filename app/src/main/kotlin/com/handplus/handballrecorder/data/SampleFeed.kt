@@ -14,7 +14,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * 配信（`handball-sample-matches` の `/v2/`）から試合 / ハイライトを取得する。
+ * 配信（`handball-match-data`）から試合 / ハイライトを取得する。
  *
  * **JSON → DTO の parse はコアの責務**（`parseSampleIndex` / `parseSampleMatch` /
  * `parseSampleHighlightIndex`）。この層が持つのは HTTP と、失敗の分類だけ。
@@ -30,9 +30,9 @@ class SampleFeed(
     private val readTimeoutMillis: Int = DEFAULT_TIMEOUT_MILLIS,
 ) {
 
-    /** `/v2/index.json` の `matches[]`（配信側で日付降順に確定済みなので並べ替えない）。 */
+    /** `matches/index.json` の `matches[]`（配信側で日付降順に確定済みなので並べ替えない）。 */
     suspend fun fetchMatchIndex(): FeedResult<List<SampleMatchSummaryV2>> {
-        val json = when (val fetched = fetchText("$baseUrl/index.json")) {
+        val json = when (val fetched = fetchText("$baseUrl/matches/index.json")) {
             is FeedResult.Success -> fetched.value
             is FeedResult.Failure -> return fetched
         }
@@ -45,11 +45,11 @@ class SampleFeed(
         return FeedResult.Success(dto.matches)
     }
 
-    /** `/v2/matches/{slug}.json`。 */
+    /** `matches/{slug}.json`。 */
     suspend fun fetchMatch(slug: String): FeedResult<SampleMatchDtoV2> =
         fetchMatchBody(slug, "$baseUrl/matches")
 
-    /** `/v2/highlights/index.json` の `highlights[]`。 */
+    /** `highlights/index.json` の `highlights[]`。 */
     suspend fun fetchHighlightIndex(): FeedResult<List<SampleHighlightSummaryV2>> {
         val json = when (val fetched = fetchText("$baseUrl/highlights/index.json")) {
             is FeedResult.Success -> fetched.value
@@ -64,7 +64,7 @@ class SampleFeed(
         return FeedResult.Success(dto.highlights)
     }
 
-    /** `/v2/highlights/{slug}.json`（本体は試合と同じ `SampleMatchDtoV2`）。 */
+    /** `highlights/{slug}.json`（本体は試合と同じ `SampleMatchDtoV2`）。 */
     suspend fun fetchHighlight(slug: String): FeedResult<SampleMatchDtoV2> =
         fetchMatchBody(slug, "$baseUrl/highlights")
 
@@ -135,9 +135,12 @@ class SampleFeed(
     }
 
     companion object {
-        /** 配信のベース URL（`handball-sample-matches` の `main` ブランチ）。 */
+        /**
+         * 配信のベース URL（`handball-match-data` の `main` ブランチの root）。
+         * v0.1 は `handball-sample-matches` の `/v2/` を読む。
+         */
         const val DEFAULT_BASE_URL: String =
-            "https://raw.githubusercontent.com/kinjo-ryura/handball-sample-matches/main/v2"
+            "https://raw.githubusercontent.com/kinjo-ryura/handball-match-data/main"
 
         /** このアプリが読める配信スキーマ。index の値がこれと違えば全体を失敗にする。 */
         const val SCHEMA_VERSION: Long = 2L
