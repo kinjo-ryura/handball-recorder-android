@@ -1,3 +1,12 @@
+import groovy.json.JsonOutput
+import javax.xml.parsers.DocumentBuilderFactory
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.result.ResolvedArtifactResult
+import org.gradle.api.artifacts.type.ArtifactTypeDefinition
+import org.gradle.maven.MavenModule
+import org.gradle.maven.MavenPomArtifact
+import org.w3c.dom.Element
+
 plugins {
     // Kotlin は AGP 9 の内蔵サポートが供給するので、`org.jetbrains.kotlin.android` は
     // 宣言しない（宣言するとエラーで止まる。理由はルートの build.gradle.kts）。
@@ -86,6 +95,67 @@ android {
     }
 }
 
+// ── 依存の OSS ライセンス本文を APK に同梱する（handball-project#654）──
+// コアの .aar は Rust 側の依存の一覧（assets/handball_toolkit/third-party-licenses.json）を
+// 同梱してくるが、Android 側の依存（AndroidX / Kotlin / kotlinx-coroutines / JNA /
+// desugar_jdk_libs）は入っていない。APK に入る依存を POM から起こし、本文と合わせて
+// assets/third-party-licenses.json に書き出す。**一覧を手で書かない**（依存が変わると古くなる）。
+//
+// 利用者へは hand-plus.com の案内ページ（一覧画面の ⋮ →「OSS ライセンス」）が届ける。
+// GPL / MPL の「ソースの入手方法を知らせる」はそのページが担う。
+
+// POM の `<license><name>` → SPDX の名前。**ここに無い名前が出たらビルドを止める**（新しい種類の
+// ライセンスを黙って配らない）。足すときは先にその依存を入れてよいかを判断し、本文
+// （app/third-party-licenses/）と hand-plus.com の案内ページも合わせて直す。
+val pomLicenseIds = mapOf(
+    "Apache-2.0" to "Apache-2.0",
+    "The Apache Software License, Version 2.0" to "Apache-2.0",
+    "The Apache License, Version 2.0" to "Apache-2.0",
+    "BSD-3-Clause" to "BSD-3-Clause",
+    "GNU General Public License, version 2, with the Classpath Exception" to
+        "GPL-2.0-only WITH Classpath-exception-2.0",
+    "LGPL-2.1-or-later" to "LGPL-2.1-or-later",
+)
+
+// POM が複数のライセンスを挙げる依存のうち、1 つを選んで受けるもの。POM の形からは選択（OR）か
+// 併用（AND）かが分からないので、ここに無い依存が複数を挙げたらビルドを止める。
+val chosenLicensesByModule = mapOf(
+    // JNA は Apache-2.0 と LGPL-2.1 の選択。LGPL は利用者が差し替えて再リンクできる形での配布を
+    // 求めるので、Apache-2.0 で受ける。
+    "net.java.dev.jna:jna" to "Apache-2.0",
+)
+
+androidComponents {
+    onVariants { variant ->
+        // APK に dex として入る依存だけを数える。BOM（compose-bom など）は版を決めるだけで
+        // classes jar を持たないので外れる。コアの .aar はファイル参照で Maven のモジュール
+        // ではないので外れる（コアの一覧は .aar 自身が同梱している）。
+        val runtimeArtifacts = variant.runtimeConfiguration.incoming.artifactView {
+            attributes { attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, "android-classes-jar") }
+        }.artifacts.resolvedArtifacts
+        // desugar_jdk_libs は実行時クラスパスに居ない。L8 が別の dex にして APK へ入れる。
+        val desugarArtifacts = configurations.named("coreLibraryDesugaring")
+            .flatMap { it.incoming.artifacts.resolvedArtifacts }
+        val task = tasks.register<GenerateThirdPartyLicenses>(
+            "generate${variant.name.replaceFirstChar(Char::titlecase)}ThirdPartyLicenses",
+        ) {
+            pomLicenses.set(
+                runtimeArtifacts.zip(desugarArtifacts) { runtime, desugar ->
+                    pomLicenseNames(
+                        (runtime + desugar)
+                            .mapNotNull { (it.id.componentIdentifier as? ModuleComponentIdentifier)?.displayName }
+                            .toSortedSet(),
+                    )
+                },
+            )
+            licenseIds.set(pomLicenseIds)
+            chosenLicenses.set(chosenLicensesByModule)
+            licenseTextDir.set(layout.projectDirectory.dir("third-party-licenses"))
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(task, GenerateThirdPartyLicenses::outputDir)
+    }
+}
+
 dependencies {
     // ── コア ──
     // 配布された .aar を app/libs/ に置いて参照する。**外部利用者とまったく同じ経路**で、
@@ -142,4 +212,132 @@ dependencies {
     // `factLog` の ORDER BY をコアと共有する fixture と突き合わせる（FactPersistenceOrderTest。
     // handball-project#405）。JVM には Android の SQLite が無いので sqlite-jdbc で同じ SQL を実行する。
     testImplementation("org.xerial:sqlite-jdbc:3.53.4.0")
+}
+
+/**
+ * 依存（`group:artifact:version`）ごとに、POM の `<licenses>` が挙げるライセンス名を返す。
+ * 自分の POM に無ければ親 POM（`<parent>`）をたどる（Guava の listenablefuture など）。
+ */
+fun pomLicenseNames(modules: Set<String>): Map<String, List<String>> {
+    val found = sortedMapOf<String, List<String>>()
+    // 読む POM → その答えを待っている依存
+    var pending: Map<String, List<String>> = modules.associateWith { listOf(it) }
+    repeat(5) {
+        if (pending.isEmpty()) return found
+        val poms = resolvePoms(pending.keys)
+        val next = mutableMapOf<String, MutableList<String>>()
+        for ((coordinates, owners) in pending) {
+            val pom = poms[coordinates] ?: throw GradleException("$coordinates の POM を取得できませんでした。")
+            val root = DocumentBuilderFactory.newInstance()
+                .apply { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+                .newDocumentBuilder().parse(pom).documentElement
+            val names = root.child("licenses")?.children("license")
+                ?.mapNotNull { it.child("name")?.textContent?.trim() }
+                .orEmpty()
+            if (names.isNotEmpty()) {
+                owners.forEach { found[it] = names }
+            } else {
+                val parent = root.child("parent")
+                    ?: throw GradleException("${owners.joinToString()} の POM（親を含む）にライセンスがありません。")
+                val parentCoordinates = listOf("groupId", "artifactId", "version")
+                    .joinToString(":") { parent.child(it)?.textContent?.trim().orEmpty() }
+                next.getOrPut(parentCoordinates) { mutableListOf() } += owners
+            }
+        }
+        pending = next
+    }
+    throw GradleException("親 POM を 5 段たどってもライセンスが見つかりません: ${pending.values.flatten()}")
+}
+
+fun resolvePoms(modules: Collection<String>): Map<String, File> {
+    val query = dependencies.createArtifactResolutionQuery()
+    modules.forEach { coordinates ->
+        val (group, name, version) = coordinates.split(":")
+        query.forModule(group, name, version)
+    }
+    return query.withArtifacts(MavenModule::class.java, MavenPomArtifact::class.java).execute()
+        .resolvedComponents
+        .associate { component ->
+            component.id.displayName to component.getArtifacts(MavenPomArtifact::class.java)
+                .filterIsInstance<ResolvedArtifactResult>().single().file
+        }
+}
+
+fun Element.children(tag: String): List<Element> =
+    (0 until childNodes.length).map(childNodes::item).filterIsInstance<Element>().filter { it.tagName == tag }
+
+fun Element.child(tag: String): Element? = children(tag).firstOrNull()
+
+/**
+ * 依存のライセンス一覧と本文を `third-party-licenses.json` に書き出す。形はコアの
+ * `handball_toolkit/third-party-licenses.json` に揃える（`licenses[]` に本文、`libraries[]` が
+ * `licenseIndexes` で参照する。同じ本文は 1 件にまとめる）。
+ */
+abstract class GenerateThirdPartyLicenses : DefaultTask() {
+    /** 依存（`group:artifact:version`）→ POM が挙げるライセンス名。 */
+    @get:Input
+    abstract val pomLicenses: MapProperty<String, List<String>>
+
+    /** POM のライセンス名 → SPDX の名前。 */
+    @get:Input
+    abstract val licenseIds: MapProperty<String, String>
+
+    /** `group:artifact` → 複数のライセンスから選んで受けるもの。 */
+    @get:Input
+    abstract val chosenLicenses: MapProperty<String, String>
+
+    /**
+     * 本文。`<group>/<artifact>/<SPDX>.txt` があればそれを、無ければ `<SPDX>.txt` を使う
+     * （SPDX の空白は `-`）。BSD のように著作権表示が本文の一部になるものは依存ごとに置く。
+     */
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val licenseTextDir: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val textDir = licenseTextDir.get().asFile
+        val licenses = mutableListOf<Map<String, String>>()
+        val licenseIndexes = mutableMapOf<File, Int>()
+        val libraries = pomLicenses.get().toSortedMap().map { (coordinates, names) ->
+            val (group, artifact, version) = coordinates.split(":")
+            val module = "$group:$artifact"
+            val ids = names.map { name ->
+                licenseIds.get()[name] ?: throw GradleException(
+                    "$coordinates のライセンス「$name」は、受け入れる一覧（app/build.gradle.kts の pomLicenseIds）にありません。",
+                )
+            }.distinct()
+            val chosen = chosenLicenses.get()[module]
+            val applied = when {
+                chosen != null -> {
+                    if (chosen !in ids) throw GradleException("$coordinates で選んだ $chosen が POM にありません（POM: $ids）。")
+                    listOf(chosen)
+                }
+                ids.size > 1 -> throw GradleException(
+                    "$coordinates の POM は複数のライセンスを挙げています（$ids）。選択か併用かを確かめ、" +
+                        "選択なら app/build.gradle.kts の chosenLicensesByModule に足してください。",
+                )
+                else -> ids
+            }
+            val indexes = applied.map { id ->
+                val fileName = "${id.replace(' ', '-')}.txt"
+                val text = listOf(textDir.resolve("$group/$artifact/$fileName"), textDir.resolve(fileName))
+                    .firstOrNull(File::isFile)
+                    ?: throw GradleException(
+                        "$coordinates の $id の本文がありません（app/third-party-licenses/$fileName か " +
+                            "app/third-party-licenses/$group/$artifact/$fileName）。",
+                    )
+                licenseIndexes.getOrPut(text) {
+                    licenses += mapOf("id" to id, "text" to text.readText())
+                    licenses.lastIndex
+                }
+            }
+            mapOf("name" to module, "version" to version, "licenseIndexes" to indexes)
+        }
+        val json = JsonOutput.toJson(mapOf("schemaVersion" to 1, "licenses" to licenses, "libraries" to libraries))
+        outputDir.get().asFile.resolve("third-party-licenses.json").writeText(JsonOutput.prettyPrint(json) + "\n")
+    }
 }

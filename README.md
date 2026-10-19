@@ -63,6 +63,7 @@ panic はネイティブの abort としてプロセスを落とす。`try / cat
 | ハイライト詳細（シーン一覧 + 「このハイライトの記録」） | `ui/detail/HighlightDetailScreen.kt` |
 | **通し再生（「すべて再生」）** | `ui/playback/` |
 | YouTube の再生・行タップからのシーク | `ui/video/` |
+| OSS ライセンスの案内（一覧の右上 ⋮ → hand-plus.com をブラウザで開く） | `ui/list/MatchListScreen.kt`。本文の同梱は[下記](#依存の-oss-ライセンス表示) |
 | **（未使用）** Room の write 経路 — シェル契約 3 trait / 15 メソッドの実装 | `RoomWriteRepositories.kt` / `db/`。**呼び出し側は 0 件**。記録機能の足場として残している（消すかどうかは「記録したい」が出た時点で決める）。R8 は Room の keep ルールで DB クラスを残すので、未使用でも APK からは消えない |
 
 **スタッツは試合詳細の下ではなく別画面です**（試合詳細の右上「サマリ」から開く）。
@@ -461,6 +462,13 @@ https://hand-plus.com/handball-recorder/android/ を直すのは鍵を替えた�
 **古いハッシュを貼りっぱなしにしないこと。** 合わない値が載っていると確かめた人に偽の
 警告を出すことになり、次からは誰も確かめなくなる。載せないより悪い。
 
+**Release 本文の「ライセンス」節に OSS ライセンスの案内ページを書く**（handball-project#654）。
+APK を落とす場所でも、含まれる OSS のライセンス表示とソースの入手先がどこにあるかを示す:
+
+```
+このアプリに含まれるオープンソースソフトウェアのライセンス表示: https://hand-plus.com/handball-recorder/licenses/
+```
+
 ## インストール（利用者向け）
 
 APK は [Releases](https://github.com/kinjo-ryura/handball-recorder-android/releases) で配布する。
@@ -529,3 +537,29 @@ reporting）で報告してください。
 
 **ランチャーアイコンも同じ扱い**（iOS 版から移植した意匠をそのまま MIT で配っている）。
 → [アイコン](#アイコン)
+
+### 依存の OSS ライセンス表示
+
+APK に入る依存のライセンス一覧と本文は、2 つの一覧として APK に同梱している（handball-project#654）。
+
+| APK の中 | 中身 | 作るもの |
+|---|---|---|
+| `assets/third-party-licenses.json` | Android 側の依存（AndroidX / Kotlin / kotlinx-coroutines / JNA / desugar_jdk_libs） | `app/build.gradle.kts` の `generate<Variant>ThirdPartyLicenses` がビルドのたびに POM から起こす |
+| `assets/handball_toolkit/third-party-licenses.json` | コアの Rust 側の依存 | コアの `.aar` が同梱してくる |
+
+利用者へは [hand-plus.com の案内ページ](https://hand-plus.com/handball-recorder/licenses/)
+（一覧画面の右上 ⋮ →「OSS ライセンス」）が届ける。MPL-2.0（コアの依存）と GPL（desugar_jdk_libs）の
+「ソースの入手方法を知らせる」はこのページが担うので、**URL を変えない**。
+
+- **一覧を手で書かない。** 依存を足しても引いても、次のビルドで一覧が変わる
+- **POM のライセンス名が `pomLicenseIds` に無いとビルドが止まる。** 落ちたときに安易に足して通さない —
+  まずその依存を入れてよいかを判断し、本文（`app/third-party-licenses/`）と案内ページも合わせて直す
+- **POM が複数のライセンスを挙げてもビルドが止まる**（選択か併用かが POM からは分からない）。
+  JNA は Apache-2.0 と LGPL-2.1 の選択で、Apache-2.0 で受けている（`chosenLicensesByModule`）
+- 本文は `app/third-party-licenses/<SPDX>.txt`。BSD のように著作権表示が本文の一部になるものは
+  `app/third-party-licenses/<group>/<artifact>/<SPDX>.txt` に依存ごとに置く（こちらが優先）
+- **desugar_jdk_libs**（`java.time` を Android 7 で動かすためのもの。OpenJDK 由来）は
+  GPLv2 + Classpath Exception。本文は [google/desugar_jdk_libs](https://github.com/google/desugar_jdk_libs) の
+  `LICENSE` に、`java.time` のソースに添えられた JSR-310 の表示を足したもの。minSdk を 26 に上げれば
+  APK から消えるが、Android 7 を保つためにこの形にしている
+- CI は release の APK に 2 つの一覧が入っているかを見る（抜けても画面にもテストにも何も出ないため）

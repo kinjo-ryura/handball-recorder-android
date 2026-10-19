@@ -111,6 +111,22 @@ jobs:
       - name: assembleRelease（R8 を通す）
         run: ./gradlew :app:assembleRelease --console=plain
 
+      # 依存のライセンス本文が配る APK に入っているかを見る（handball-project#654）。本文の同梱が
+      # ライセンスの義務そのもので、抜けても画面にもテストにも何も出ない。packaging の除外や
+      # assets の置き場所を変えたときに黙って抜けないよう、release の APK を直接見る。
+      #   - third-party-licenses.json … Android 側の依存（app/build.gradle.kts が POM から起こす）
+      #   - handball_toolkit/… … コアの Rust 側の依存（.aar が同梱してくる）
+      - name: ライセンス本文が APK に入っているか
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release-unsigned.apk
+          for entry in assets/third-party-licenses.json assets/handball_toolkit/third-party-licenses.json; do
+            if ! unzip -l "$apk" "$entry" > /dev/null; then
+              echo "::error::$apk に $entry がありません。" >&2
+              exit 1
+            fi
+          done
+
       # 純関数へ切り出した部分（ClipProgression / FullscreenState / ScoreDiffChartGeometry /
       # YouTubeBridge ほか）を JVM 上で固定する。2026-09-06 時点で 19 クラス 205 件。
       - name: 単体テスト
