@@ -2,6 +2,7 @@ package com.handplus.handballrecorder.ui.list
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,9 +12,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -23,8 +27,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -72,7 +82,12 @@ fun MatchListScreen(
     onOpen: (kind: String, slug: String) -> Unit,
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("ハンド記録") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("ハンド記録") },
+                actions = { AppMenu() },
+            )
+        },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             TabRow(selectedTabIndex = state.tab.ordinal) {
@@ -100,6 +115,42 @@ fun MatchListScreen(
                     ListTab.HIGHLIGHT -> HighlightTabContent(state = state, onRetry = onRetry, onOpen = onOpen)
                 }
             }
+        }
+    }
+}
+
+/**
+ * 右上の ⋮。いまは「OSS ライセンス」だけ（handball-project#654）。
+ *
+ * 設定画面を持たないので、アプリ全体に関わる入口はここに置く。ページは端末のブラウザで開く
+ * （iOS 版の設定タブ →「オープンソースライセンス」が Safari で開くのと同じ）。
+ */
+@Composable
+private fun AppMenu() {
+    var expanded by remember { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            // 読み上げは記号ではなく「メニュー」にする（Icon の contentDescription と同じ役）。
+            Text(
+                text = MENU_MARK,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.clearAndSetSemantics { contentDescription = "メニュー" },
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("OSS ライセンス") },
+                onClick = {
+                    expanded = false
+                    // ブラウザが 1 つも無い端末では開けず、IllegalArgumentException になる。
+                    // 開けないだけなので落とさない（それ以外の例外までは畳まない）。
+                    try {
+                        uriHandler.openUri(LICENSES_URL)
+                    } catch (_: IllegalArgumentException) {
+                    }
+                },
+            )
         }
     }
 }
@@ -345,6 +396,15 @@ private fun EmptyList(message: String) {
  * web デモも同じ ▶ を「押すと動画が飛ぶ」目印に使っている。
  */
 private const val VIDEO_MARK = "▶"
+
+/** メニューのしるし。[VIDEO_MARK] と同じく、アイコンフォントを足さずに記号で済ませる。 */
+private const val MENU_MARK = "⋮"
+
+/**
+ * OSS ライセンスの案内ページ。依存のライセンス本文は APK に同梱しており、このページは
+ * MPL-2.0 / GPL の「ソースの入手方法を知らせる」を担う。**URL を変えない**（配った APK が開き続ける）。
+ */
+private const val LICENSES_URL = "https://hand-plus.com/handball-recorder/licenses/"
 
 @Preview(showBackground = true)
 @Composable
