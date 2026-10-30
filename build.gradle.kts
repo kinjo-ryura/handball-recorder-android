@@ -12,7 +12,7 @@
 // 完全一致が要求される関係にあるため二重管理にはならない。
 // 上げるときは README「バージョンの対応関係」も同時に直すこと。
 plugins {
-    id("com.android.application") version "9.4.1" apply false
+    id("com.android.application") version "9.5.0" apply false
     // Compose コンパイラプラグイン。Kotlin 2.0 以降はコンパイラ本体と同梱なので、
     // **バージョンは Kotlin と完全一致でなければならない**（片方だけ上げると解決に失敗する）。
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.21" apply false
