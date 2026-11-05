@@ -19,5 +19,5 @@ plugins {
     // KSP は 2.3.x から Kotlin と別系列の版を持つ（以前の `<Kotlin>-<KSP>` 形式ではない）。
     // Kotlin と完全一致させる必要はなくなったが、対応する Kotlin の範囲は KSP の
     // リリースノートが決めるので、Kotlin を上げたらここも見ること。
-    id("com.google.devtools.ksp") version "2.3.12" apply false
+    id("com.google.devtools.ksp") version "2.3.13" apply false
 }
