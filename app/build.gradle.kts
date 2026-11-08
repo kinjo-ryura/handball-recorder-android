@@ -180,7 +180,7 @@ dependencies {
 
     // ── 画面（Jetpack Compose / Material 3）──
     // BOM が版をまとめて決めるのは **androidx.compose.* だけ**。activity / lifecycle /
-    // navigation は BOM の管轄外なので個別に版を書く（README のバージョン表と対応）。
+    // navigation は BOM の管轄外なので個別に版を書く（README「バージョンの対応関係」。版は README に写さない）。
     implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")

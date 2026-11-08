@@ -33,6 +33,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # README とビルド定義のコメントに依存の版を写していないかを見る（handball-project#783）。
+      # 版を上げるのは Dependabot で、書き換えるのはビルド定義だけなので、写した版は上げるたびに
+      # 古いまま残る（表と本文の取り残しが 3 回続いた）。版を書いた PR をその場で止める。
+      # SDK も Gradle も要らないので最初に回す（ランナー同梱の python3 で動く）。
+      - name: README に依存の版が書かれていないか
+        run: python3 scripts/check-readme-versions.py --root . README.md
+
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -59,8 +66,8 @@ jobs:
       # コアは prebuilt .aar として handball-toolkit の Release から取る。
       # **Rust / NDK は要らない**（ADR 0006）。外部利用者とまったく同じ経路を通る。
       #
-      # 版は app/build.gradle.kts から読む。ここに版を書くと README・ビルド定義との
-      # 三重管理になり、上げたときに CI だけ古い .aar で緑になる。
+      # 版は app/build.gradle.kts から読む。ここに版を書くとビルド定義との二重管理になり、
+      # 上げたときに CI だけ古い .aar で緑になる（README にも版は書かない。上の検査）。
       - name: コアの .aar を取得
         run: |
           set -euo pipefail
