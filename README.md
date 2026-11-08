@@ -265,9 +265,11 @@ Activity が作り直され、`WebView` を持つコントローラごと捨て�
 **Rust / NDK は要らない。** コアは `.aar` の中に `.so` として入っている。
 
 ```sh
-# コアの .aar を Releases から落とす（app/libs/ はコミットしない）
+# コアの .aar を Releases から落とす（app/libs/ はコミットしない）。
+# 版は app/build.gradle.kts の files("libs/handball-toolkit-<版>.aar") から読む
+ver=$(sed -n 's/.*files("libs\/handball-toolkit-\(.*\)\.aar").*/\1/p' app/build.gradle.kts)
 mkdir -p app/libs
-gh release download v0.11.0 --repo kinjo-ryura/handball-toolkit --pattern '*.aar' --dir app/libs
+gh release download "v$ver" --repo kinjo-ryura/handball-toolkit --pattern '*.aar' --dir app/libs
 
 ./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
@@ -289,24 +291,32 @@ devShell に入るたびに wrapper のピン留めと一致するかを検査�
 
 ### バージョンの対応関係
 
-| | バージョン | 備考 |
+**この表には依存の版を書かない。** 版を持つのはビルド定義だけで、表は「どこで決まるか」と「なぜ」を書く。
+依存を上げるのは Dependabot（`.github/dependabot.yml`）で、書き換えるのはビルド定義だけなので、
+表に版を写していたころは上げるたびに表と本文が古いまま残った（handball-project#783）。
+README とビルド定義のコメントに今の依存の版を書くと、CI の `scripts/check-readme-versions.py` が落とす
+（手元では `python3 scripts/check-readme-versions.py --root . README.md`）。
+SDK のレベル（compileSdk / targetSdk / minSdk / build-tools）は Dependabot が上げず、SDK の入れ方を書くのに
+数字が要るので、ここに書く（検査も見ない）。
+
+| | どこで決まるか | 備考 |
 |---|---|---|
-| Gradle | 9.8.2 | wrapper がピン留め（配布物の SHA-256 も固定）。AGP 9.5 は Gradle 9.6.0+ を要求 |
-| AGP | 9.5.0 | **Kotlin サポートを内蔵する**（下記） |
-| Kotlin | 2.4.21 | **プラグインとしては宣言しない。** 版は Compose コンパイラプラグインが連れてくる（下記） |
-| KSP | 2.3.13 | **2.3.x から Kotlin と別系列**（以前の `<Kotlin>-<KSP>` 形式ではない）。完全一致は不要 |
-| Compose コンパイラプラグイン | 2.4.21 | `org.jetbrains.kotlin.plugin.compose`。**Kotlin と完全一致が必要**（Kotlin 2.0 以降はコンパイラ同梱） |
-| Compose BOM | 2026.09.00 | `androidx.compose.*` の版を決める |
-| activity-compose | 1.13.0 | **BOM の管轄外**（BOM が版を決めるのは `androidx.compose.*` だけ） |
-| core-ktx | 1.19.1 | 全画面のシステムバー制御（`WindowInsetsControllerCompat`）。推移的にも入るが、使うものは自分で宣言する |
-| lifecycle-viewmodel-compose / lifecycle-runtime-compose | 2.11.0 | 同上 |
-| navigation-compose | 2.10.2 | 同上 |
-| Room | 2.8.5 | |
-| handball-toolkit | 0.11.0 | `app/libs/handball-toolkit-0.11.0.aar` |
-| JNA | 5.19.1（`@aar`） | **`.aar` は依存情報を運ばない**ので利用側で宣言する |
-| kotlinx-coroutines | 1.11.0 | 同上 |
-| compileSdk / targetSdk | 37 | プラットフォームのパッケージ名は **`platforms;android-37.0`**（下記）。`buildToolsVersion = "37.0.0"` を明示 |
-| minSdk | 24 | `java.time` を使うため `coreLibraryDesugaring` が要る |
+| Gradle | `gradle/wrapper/gradle-wrapper.properties` の `distributionUrl` | wrapper がピン留め（配布物の SHA-256 も `distributionSha256Sum` で固定）。AGP ごとに要求する Gradle の最低版がある（AGP のリリースノート） |
+| AGP | ルートの `build.gradle.kts` の `com.android.application` | **Kotlin サポートを内蔵する**（下記） |
+| Kotlin | ルートの `build.gradle.kts` の `org.jetbrains.kotlin.plugin.compose` | **プラグインとしては宣言しない。** 版は Compose コンパイラプラグインが連れてくる（下記） |
+| KSP | ルートの `build.gradle.kts` の `com.google.devtools.ksp` | **2.3.x から Kotlin と別系列**（以前の `<Kotlin>-<KSP>` 形式ではない）。完全一致は不要だが、対応する Kotlin の範囲は KSP のリリースノートが決める |
+| Compose コンパイラプラグイン | ルートの `build.gradle.kts` の `org.jetbrains.kotlin.plugin.compose` | **Kotlin と完全一致が必要**（Kotlin 2.0 以降はコンパイラ同梱）。この版がそのまま Kotlin の版になる |
+| Compose BOM | `app/build.gradle.kts` の `compose-bom` | `androidx.compose.*` の版を決める |
+| activity-compose | `app/build.gradle.kts` | **BOM の管轄外**（BOM が版を決めるのは `androidx.compose.*` だけ） |
+| core-ktx | `app/build.gradle.kts` | 全画面のシステムバー制御（`WindowInsetsControllerCompat`）。推移的にも入るが、使うものは自分で宣言する |
+| lifecycle-viewmodel-compose / lifecycle-runtime-compose | `app/build.gradle.kts` | 同上 |
+| navigation-compose | `app/build.gradle.kts` | 同上 |
+| Room | `app/build.gradle.kts` | |
+| handball-toolkit | `app/build.gradle.kts` の `files("libs/handball-toolkit-<版>.aar")` と `toolkitAarSha256` | Maven の依存ではないので Dependabot は上げない。上げ方は「変更の出し方」 |
+| JNA | `app/build.gradle.kts`（`@aar`） | **`.aar` は依存情報を運ばない**ので利用側で宣言する |
+| kotlinx-coroutines | `app/build.gradle.kts` | 同上 |
+| compileSdk / targetSdk | `app/build.gradle.kts`（37） | プラットフォームのパッケージ名は **`platforms;android-37.0`**（下記）。`buildToolsVersion = "37.0.0"` を明示 |
+| minSdk | `app/build.gradle.kts`（24） | `java.time` を使うため `coreLibraryDesugaring` が要る |
 
 #### Kotlin プラグインは宣言しない（AGP 9 の内蔵 Kotlin）
 
@@ -320,15 +330,16 @@ Failed to apply plugin 'org.jetbrains.kotlin.android'.
 
 → [AGP 内蔵 Kotlin への移行](https://kotl.in/gradle/agp-built-in-kotlin)
 
-**そのため Kotlin の版を書く場所が無い。** AGP 9.5.0 が既定で連れてくる KGP は 2.2.10 だが、
-`compose-compiler-gradle-plugin:2.4.21` が `kotlin-gradle-plugin:2.4.21` に依存するので、
-buildscript のクラスパス解決（同一モジュールは最大版が勝つ）で **2.4.21 になる**。
+**そのため Kotlin の版を書く場所が無い。** AGP が既定で連れてくる KGP（Kotlin Gradle Plugin）は
+Compose コンパイラプラグインより古いが、`compose-compiler-gradle-plugin:<版>` は同じ版の
+`kotlin-gradle-plugin:<版>` に依存するので、buildscript のクラスパス解決（同一モジュールは最大版が勝つ）で
+**Compose コンパイラプラグインと同じ版になる**。
 つまり**ルートの `build.gradle.kts` にある Compose コンパイラプラグインの版が、そのまま
 このプロジェクトの Kotlin 版**である。両者は元から完全一致が要求される関係なので二重管理には
 ならない。確かめ方:
 
 ```sh
-./gradlew buildEnvironment | grep kotlin-gradle-plugin   # 2.2.10 -> 2.4.21 と出る
+./gradlew buildEnvironment | grep kotlin-gradle-plugin   # <AGP の既定の版> -> <Compose コンパイラプラグインの版> と出る
 ```
 
 #### compileSdk 37 は `platforms;android-37.0`
@@ -404,15 +415,16 @@ gh pr merge --squash --delete-branch   # CI が緑になってから
 ```
 
 CI（[`.github/workflows/ci.yml`](.github/workflows/ci.yml) の `check`）が回すのは
-**assembleDebug / 単体テスト / lint**、そして **`gradle-wrapper.jar` の検証**（コミット済みの
+**assembleDebug / 単体テスト / lint**、**`gradle-wrapper.jar` の検証**（コミット済みの
 wrapper が正規の配布物かを照合する。fork される前提の public repo なので、差し替えられた
-wrapper を黙って実行しないことに意味がある）。コアの `.aar` は handball-toolkit の Release から
+wrapper を黙って実行しないことに意味がある）、そして **README に依存の版が書かれていないかの検査**
+（上の「バージョンの対応関係」）。コアの `.aar` は handball-toolkit の Release から
 取るので、CI でも手元と同じく **Rust / NDK は要らない**。
 
 `.aar` の版と **SHA-256** は `app/build.gradle.kts` の 1 か所だけが持ち、CI はそこから読んで
 Release から落とした `.aar` を照合する（handball-project#285。Release のアセットはタグと違って
-後から差し替えられる）。上げるときはそのファイルの 2 行（`files("libs/…")` と `toolkitAarSha256`）と
-上のバージョン表を直せばよい（workflow は触らない）。値は `shasum -a 256 app/libs/handball-toolkit-<版>.aar`。
+後から差し替えられる）。上げるときはそのファイルの 2 行（`files("libs/…")` と `toolkitAarSha256`）だけを
+直せばよい（workflow も README も触らない）。値は `shasum -a 256 app/libs/handball-toolkit-<版>.aar`。
 
 CI は `assembleRelease` も回す（R8 の設定エラーはここで止まる）が、**R8 が壊すのは reflection 経由の
 実行時の参照で、ビルドが通っても保証にならない**（下の「リリースを出すとき」）。

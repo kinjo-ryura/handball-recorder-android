@@ -5,12 +5,15 @@
 // エラーになる**（"The 'org.jetbrains.kotlin.android' plugin is no longer required for
 // Kotlin support since AGP 9.0"）。→ https://kotl.in/gradle/agp-built-in-kotlin
 //
-// **Kotlin の版を決めるのは下の compose プラグインである。** AGP 9.4.1 が既定で連れてくる
-// KGP は 2.2.10 だが、compose-compiler-gradle-plugin:2.4.20 が kotlin-gradle-plugin:2.4.20 に
-// 依存するので、buildscript のクラスパス解決（同一モジュールは最大版が勝つ）で 2.4.20 になる。
+// **Kotlin の版を決めるのは下の compose プラグインである。** AGP が既定で連れてくる KGP は
+// compose プラグインより古いが、compose-compiler-gradle-plugin は同じ版の kotlin-gradle-plugin に
+// 依存するので、buildscript のクラスパス解決（同一モジュールは最大版が勝つ）で compose プラグインの版になる。
 // **つまり compose プラグインの版 = このプロジェクトの Kotlin 版**で、両者は元から
 // 完全一致が要求される関係にあるため二重管理にはならない。
-// 上げるときは README「バージョンの対応関係」も同時に直すこと。
+//
+// **版はこのファイルと app/build.gradle.kts だけが持つ。** README にも、このファイルのコメントにも
+// 版の数字を写さないこと（Dependabot は宣言の行しか上げないので、写した版は古いまま残る。
+// CI の scripts/check-readme-versions.py が落とす。handball-project#783）。
 plugins {
     id("com.android.application") version "9.5.0" apply false
     // Compose コンパイラプラグイン。Kotlin 2.0 以降はコンパイラ本体と同梱なので、
