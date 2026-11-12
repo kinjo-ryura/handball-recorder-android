@@ -15,7 +15,7 @@
 // 版の数字を写さないこと（Dependabot は宣言の行しか上げないので、写した版は古いまま残る。
 // CI の scripts/check-readme-versions.py が落とす。handball-project#783）。
 plugins {
-    id("com.android.application") version "9.5.0" apply false
+    id("com.android.application") version "9.5.1" apply false
     // Compose コンパイラプラグイン。Kotlin 2.0 以降はコンパイラ本体と同梱なので、
     // **バージョンは Kotlin と完全一致でなければならない**（片方だけ上げると解決に失敗する）。
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.21" apply false
