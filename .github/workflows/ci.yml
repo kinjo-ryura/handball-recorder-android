@@ -46,16 +46,17 @@ jobs:
           java-version: '21'
 
       # ランナー同梱の SDK には buildToolsVersion = "37.0.0" が無い（app/build.gradle.kts が
-      # 明示している）。compileSdk = 37 と組で入れる。
+      # 明示している）。compileSdk と組で入れる。
       #
-      # **プラットフォームのパッケージ名は `platforms;android-37.0` で、`android-37` ではない。**
-      # API 37 から minor 付きで配られるようになり（`37.0` / `37.1` / `37.2`…）、minor 無しの
-      # 名前は存在しない。`android-37` を渡すと sdkmanager は
+      # **プラットフォームは app/build.gradle.kts の `release(37) { minorApiLevel = N }` と同じ
+      # `platforms;android-37.N`。** API 37 から minor 付きで配られるようになり（`37.0` / `37.1` /
+      # `37.2`…）、minor 無しの名前は存在しない。`android-37` を渡すと sdkmanager は
       # `Warning: Failed to find package 'platforms;android-37'` を出して終了コード 1 で落ちる
       # （2026-09-06 実測）。**警告の文言に反して素通りはしない**ので、取り違えはここで止まる。
+      # minor を上げたのに直し忘れると、Gradle が SDK に無いプラットフォームを探して落ちる。
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
-          packages: 'platforms;android-37.0 build-tools;37.0.0'
+          packages: 'platforms;android-37.2 build-tools;37.0.0'
 
       # Gradle 本体は wrapper が供給する（flake ではない — README「nix を使う場合」）。
       # このアクションは依存のキャッシュに加え、**コミット済みの gradle-wrapper.jar が

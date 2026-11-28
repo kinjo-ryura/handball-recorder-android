@@ -254,10 +254,10 @@ Activity が作り直され、`WebView` を持つコントローラごと捨て�
   ```
 
   要るパッケージは 2 つ。**プラットフォームは `android-37`（minor 無し）では取れない**
-  （下の「compileSdk 37 は `platforms;android-37.0`」）:
+  （下の「compileSdk 37 は minor まで書く」）:
 
   ```sh
-  sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
+  sdkmanager "platforms;android-37.2" "build-tools;37.0.0"
   ```
 
 - ABI は **arm64-v8a 単独**（ADR 0006 決定 5）。エミュレータを使うなら同 ABI の AVD が要る
@@ -315,7 +315,7 @@ SDK のレベル（compileSdk / targetSdk / minSdk / build-tools）は Dependabo
 | handball-toolkit | `app/build.gradle.kts` の `files("libs/handball-toolkit-<版>.aar")` と `toolkitAarSha256` | Maven の依存ではないので Dependabot は上げない。上げ方は「変更の出し方」 |
 | JNA | `app/build.gradle.kts`（`@aar`） | **`.aar` は依存情報を運ばない**ので利用側で宣言する |
 | kotlinx-coroutines | `app/build.gradle.kts` | 同上 |
-| compileSdk / targetSdk | `app/build.gradle.kts`（37） | プラットフォームのパッケージ名は **`platforms;android-37.0`**（下記）。`buildToolsVersion = "37.0.0"` を明示 |
+| compileSdk / targetSdk | `app/build.gradle.kts`（compileSdk 37.2・targetSdk 37） | プラットフォームのパッケージ名は **`platforms;android-37.2`**（下記）。`buildToolsVersion = "37.0.0"` を明示 |
 | minSdk | `app/build.gradle.kts`（24） | `java.time` を使うため `coreLibraryDesugaring` が要る |
 
 #### Kotlin プラグインは宣言しない（AGP 9 の内蔵 Kotlin）
@@ -342,17 +342,25 @@ Compose コンパイラプラグインより古いが、`compose-compiler-gradle
 ./gradlew buildEnvironment | grep kotlin-gradle-plugin   # <AGP の既定の版> -> <Compose コンパイラプラグインの版> と出る
 ```
 
-#### compileSdk 37 は `platforms;android-37.0`
+#### compileSdk 37 は minor まで書く
 
 **API 37 からプラットフォームは minor 付きで配られる**（`37.0` / `37.1` / `37.2`…）。
 `android-37` というパッケージは**存在しない**ので、`sdkmanager "platforms;android-37"` は
 `Warning: Failed to find package` を出して終了コード 1 で落ちる（2026-09-06 実測）。
-`compileSdk = 37` が指すのは minor 無しの `android-37.0` で、CI の `setup-android` に
-渡すのもこの名前。
+`compileSdk = 37` と書くと minor 無しの `android-37.0` を指すので、minor は
+`compileSdk { version = release(37) { minorApiLevel = 2 } }` で書く。CI の `setup-android` に渡すのも、
+手元で入れるのも同じ minor の名前:
 
 ```sh
-sdkmanager "platforms;android-37.0"
+sdkmanager "platforms;android-37.2"
 ```
+
+**minor を上げる契機は依存の AAR メタデータ。** Compose などの新しい版が「compileSdk 37.N 以上」を
+要求すると、Dependabot の PR が `:app:checkDebugAarMetadata` で落ちる（`:app is currently compiled
+against android-37.0` と出る。2026-11 に Compose の BOM を上げる PR で 37.1 以上を要求された。
+handball-project#843）。そのときは build.gradle.kts の `minorApiLevel`・`ci.yml` の
+`platforms;android-37.N`・この README の sdkmanager の行の 3 か所を同じ minor に上げる。
+compileSdk は使える API を増やすだけで、実行時の挙動（targetSdk）と対応端末（minSdk）は変わらない。
 
 lint は `GradleDependency` で「もっと新しい版がある」と言い続けることがあるが、これは警告で
 あってビルドは通る。**2026-09-06 の一式更新の時点では 0 件**（残っている lint 警告 4 件は
