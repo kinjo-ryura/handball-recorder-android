@@ -20,9 +20,16 @@ plugins {
 android {
     namespace = "com.handplus.handballrecorder"
     // API 37 からプラットフォームは minor 付きで配られる（`platforms;android-37.0` /
-    // `37.1` / `37.2`…）。`compileSdk = 37` は minor 無しの `android-37.0` を指すので、
-    // CI の setup-android にも `platforms;android-37.0` を入れさせること。
-    compileSdk = 37
+    // `37.1` / `37.2`…）。`compileSdk = 37` と書くと minor 無しの `android-37.0` を指すので、
+    // minor は `minorApiLevel` で書く。**変えたら CI の setup-android の `platforms;android-37.<minor>`
+    // と README の sdkmanager の行も同じ minor にすること**（パッケージが無いと Gradle が落ちる）。
+    //
+    // minor を上げる契機は依存の AAR メタデータ（`checkDebugAarMetadata`）。Compose などの新しい版が
+    // 「compileSdk 37.N 以上」を要求すると、Dependabot の PR がこの task で落ちる（handball-project#843）。
+    // compileSdk は使える API を増やすだけで、実行時の挙動（targetSdk）と対応端末（minSdk）は変わらない。
+    compileSdk {
+        version = release(37) { minorApiLevel = 2 }
+    }
     // nix が提供する SDK には build-tools が 1 つしか入っていないため明示する。
     // 既定値（AGP のバンドル値）を要求されると read-only な nix store の SDK へ
     // ダウンロードしようとして失敗する。
@@ -181,7 +188,7 @@ dependencies {
     // ── 画面（Jetpack Compose / Material 3）──
     // BOM が版をまとめて決めるのは **androidx.compose.* だけ**。activity / lifecycle /
     // navigation は BOM の管轄外なので個別に版を書く（README「バージョンの対応関係」。版は README に写さない）。
-    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.11.01"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
